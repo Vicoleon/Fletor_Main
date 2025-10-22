@@ -185,6 +185,57 @@ TRANSLATIONS = {
         "feature_request": "Feature Request",
         "financial": "Financial",
         "support": "Support",
+        "compliance": "Compliance",
+        "compliance_dashboard": "Compliance Dashboard",
+        "license_expiry": "License Expiry",
+        "insurance_expiry": "Insurance Expiry",
+        "inspection_expiry": "Inspection Expiry",
+        "compliance_status": "Compliance Status",
+        "compliant": "Compliant",
+        "expiring_soon": "Expiring Soon",
+        "expired": "Expired",
+        "filter_by_status": "Filter by status",
+        "search_carrier": "Search by name or license...",
+        "suspend": "Suspend",
+        "unsuspend": "Unsuspend",
+        "suspension_reason": "Suspension Reason",
+        "policy_violation": "Policy Violation",
+        "fraud": "Fraud",
+        "other": "Other",
+        "notes": "Notes",
+        "confirm_suspension": "Confirm Suspension",
+        "cancel": "Cancel",
+        "user_suspended": "User suspended.",
+        "user_unsuspended": "User unsuspended.",
+        "activity_logs": "Activity Logs",
+        "action_type": "Action Type",
+        "user": "User",
+        "admin_user": "Admin User",
+        "timestamp": "Timestamp",
+        "target": "Target",
+        "filter_by_action": "Filter by action type",
+        "select_date_range": "Select date range",
+        "user_approved": "User Approved",
+        "user_rejected": "User Rejected",
+        "user_suspended": "User Suspended",
+        "user_unsuspended": "User Unsuspended",
+        "dispute_resolved": "Dispute Resolved",
+        "ticket_closed": "Ticket Closed",
+        "reports": "Reports",
+        "reporting_dashboard": "Reporting Dashboard",
+        "revenue_trends": "Revenue Trends",
+        "shipment_volume": "Shipment Volume",
+        "user_growth": "User Growth",
+        "popular_routes": "Popular Routes",
+        "carrier_performance": "Carrier Performance",
+        "daily": "Daily",
+        "weekly": "Weekly",
+        "monthly": "Monthly",
+        "export_csv": "Export CSV",
+        "export_pdf": "Export PDF",
+        "completion_rate": "Completion Rate",
+        "average_rating": "Average Rating",
+        "total_earnings": "Total Earnings",
     },
     "es": {
         "title": "Fletor",
@@ -333,7 +384,7 @@ TRANSLATIONS = {
         "other_issue": "Otro Problema",
         "open": "Abierto",
         "investigating": "Investigando",
-        "pending_resolution": "Pendiente de Resolución",
+        "pending_resolution": "Pendiente de ResoluciÃ³n",
         "resolved": "Resuelto",
         "closed": "Cerrado",
         "new": "Nuevo",
@@ -366,6 +417,57 @@ TRANSLATIONS = {
         "feature_request": "Solicitud de Función",
         "financial": "Financiero",
         "support": "Soporte",
+        "compliance": "Cumplimiento",
+        "compliance_dashboard": "Panel de Cumplimiento",
+        "license_expiry": "Vencimiento de Licencia",
+        "insurance_expiry": "Vencimiento de Seguro",
+        "inspection_expiry": "Vencimiento de Inspección",
+        "compliance_status": "Estado de Cumplimiento",
+        "compliant": "Conforme",
+        "expiring_soon": "Vence Pronto",
+        "expired": "Vencido",
+        "filter_by_status": "Filtrar por estado",
+        "search_carrier": "Buscar por nombre o licencia...",
+        "suspend": "Suspender",
+        "unsuspend": "Reactivar",
+        "suspension_reason": "Razón de Suspensión",
+        "policy_violation": "Violación de Política",
+        "fraud": "Fraude",
+        "other": "Otro",
+        "notes": "Notas",
+        "confirm_suspension": "Confirmar Suspensión",
+        "cancel": "Cancelar",
+        "user_suspended": "Usuario suspendido.",
+        "user_unsuspended": "Usuario reactivado.",
+        "activity_logs": "Registros de Actividad",
+        "action_type": "Tipo de Acción",
+        "user": "Usuario",
+        "admin_user": "Usuario Admin",
+        "timestamp": "Fecha y Hora",
+        "target": "Objetivo",
+        "filter_by_action": "Filtrar por tipo de acción",
+        "select_date_range": "Seleccionar rango de fechas",
+        "user_approved": "Usuario Aprobado",
+        "user_rejected": "Usuario Rechazado",
+        "user_suspended": "Usuario Suspendido",
+        "user_unsuspended": "Usuario Reactivado",
+        "dispute_resolved": "Disputa Resuelta",
+        "ticket_closed": "Tiquete Cerrado",
+        "reports": "Informes",
+        "reporting_dashboard": "Panel de Informes",
+        "revenue_trends": "Tendencias de Ingresos",
+        "shipment_volume": "Volumen de Envíos",
+        "user_growth": "Crecimiento de Usuarios",
+        "popular_routes": "Rutas Populares",
+        "carrier_performance": "Rendimiento de Transportistas",
+        "daily": "Diario",
+        "weekly": "Semanal",
+        "monthly": "Mensual",
+        "export_csv": "Exportar CSV",
+        "export_pdf": "Exportar PDF",
+        "completion_rate": "Tasa de Finalización",
+        "average_rating": "Calificación Promedio",
+        "total_earnings": "Ganancias Totales",
     },
 }
 
@@ -382,6 +484,18 @@ class User(TypedDict):
     vehicle_type: str | None
     is_verified: bool
     created_at: str
+    license_expiry: str | None
+    insurance_expiry: str | None
+    inspection_expiry: str | None
+    is_suspended: bool
+    suspension_reason: str | None
+    suspended_at: str | None
+    suspended_by: str | None
+
+
+class CarrierData(User):
+    compliance_status: str
+    days_to_expiry: int
 
 
 class Document(TypedDict):
@@ -490,6 +604,15 @@ class Payout(TypedDict):
     created_at: str
 
 
+class ActivityLog(TypedDict):
+    id: str
+    timestamp: str
+    admin_user_id: str
+    action_type: str
+    target_id: str
+    notes: str | None
+
+
 DB: dict[str, list] = {
     "users": [],
     "documents": [],
@@ -498,6 +621,7 @@ DB: dict[str, list] = {
     "disputes": [],
     "support_tickets": [],
     "payouts": [],
+    "activity_logs": [],
 }
 DB["users"].append(
     {
@@ -512,6 +636,13 @@ DB["users"].append(
         "vehicle_type": None,
         "is_verified": True,
         "created_at": datetime.datetime.now().isoformat(),
+        "license_expiry": None,
+        "insurance_expiry": None,
+        "inspection_expiry": None,
+        "is_suspended": False,
+        "suspension_reason": None,
+        "suspended_at": None,
+        "suspended_by": None,
     }
 )
 
@@ -543,6 +674,11 @@ class AuthState(State):
             if user["email"] == login_email and user["password_hash"] == login_password:
                 if not user["is_verified"]:
                     self.error_message = "Your account is not verified yet."
+                    return
+                if user["is_suspended"]:
+                    self.error_message = (
+                        f"Account suspended: {user['suspension_reason']}"
+                    )
                     return
                 self.is_authenticated = True
                 self.user_id = user["id"]
@@ -581,6 +717,22 @@ class RegistrationState(State):
             self.error_message = self.t["passwords_do_not_match"]
             return
         user_id = "".join(random.choices(string.ascii_lowercase + string.digits, k=10))
+        license_expiry = None
+        insurance_expiry = None
+        inspection_expiry = None
+        if self.reg_user_type == "carrier":
+            license_expiry = (
+                datetime.date.today()
+                + datetime.timedelta(days=random.randint(-15, 365))
+            ).isoformat()
+            insurance_expiry = (
+                datetime.date.today()
+                + datetime.timedelta(days=random.randint(-15, 365))
+            ).isoformat()
+            inspection_expiry = (
+                datetime.date.today()
+                + datetime.timedelta(days=random.randint(-15, 365))
+            ).isoformat()
         new_user: User = {
             "id": user_id,
             "email": self.reg_email,
@@ -599,6 +751,13 @@ class RegistrationState(State):
             else None,
             "is_verified": False,
             "created_at": datetime.datetime.now().isoformat(),
+            "license_expiry": license_expiry,
+            "insurance_expiry": insurance_expiry,
+            "inspection_expiry": inspection_expiry,
+            "is_suspended": False,
+            "suspension_reason": None,
+            "suspended_at": None,
+            "suspended_by": None,
         }
         DB["users"].append(new_user)
         self.success_message = self.t["registration_successful"]
@@ -660,9 +819,10 @@ class ProfileState(State):
     @rx.event
     async def load_documents(self):
         auth = await self.get_state(AuthState)
-        self.user_documents = [
-            doc for doc in DB["documents"] if doc["user_id"] == auth.user_id
-        ]
+        if auth.is_authenticated:
+            self.user_documents = [
+                doc for doc in DB["documents"] if doc["user_id"] == auth.user_id
+            ]
 
 
 class AdminState(State):
@@ -693,6 +853,20 @@ class AdminState(State):
     selected_ticket: SupportTicket | None = None
     dispute_filter: str = "all"
     ticket_filter: str = "all"
+
+    async def _log_activity(
+        self, action_type: str, target_id: str, notes: str | None = None
+    ):
+        auth_state = await self.get_state(AuthState)
+        log_entry = ActivityLog(
+            id="".join(random.choices(string.ascii_lowercase + string.digits, k=10)),
+            timestamp=datetime.datetime.now().isoformat(),
+            admin_user_id=auth_state.user_id,
+            action_type=action_type,
+            target_id=target_id,
+            notes=notes,
+        )
+        DB["activity_logs"].append(log_entry)
 
     @rx.event
     def load_admin_dashboard(self):
@@ -759,7 +933,7 @@ class AdminState(State):
         self.selected_user_documents = []
 
     @rx.event
-    def approve_user_with_notes(self):
+    async def approve_user_with_notes(self):
         if not self.selected_user_for_verification:
             return
         user_id = self.selected_user_for_verification["id"]
@@ -767,16 +941,18 @@ class AdminState(State):
             if user["id"] == user_id:
                 user["is_verified"] = True
                 break
+        await self._log_activity("user_approved", user_id, self.approval_notes)
         self.load_unverified_users()
         self.deselect_user()
         yield rx.toast.success(f"User {user_id} approved.")
 
     @rx.event
-    def reject_user_with_reason(self):
+    async def reject_user_with_reason(self):
         if not self.selected_user_for_verification:
             return
         user_id = self.selected_user_for_verification["id"]
         DB["users"] = [user for user in DB["users"] if user["id"] != user_id]
+        await self._log_activity("user_rejected", user_id, self.rejection_reason)
         self.load_unverified_users()
         self.deselect_user()
         yield rx.toast.info(f"User {user_id} rejected and removed.")
@@ -817,6 +993,12 @@ class AdminState(State):
         self.payouts = sorted(
             DB["payouts"], key=lambda p: p["created_at"], reverse=True
         )
+
+    async def _get_shipment_by_id(self, shipment_id: str) -> Shipment | None:
+        for s in DB["shipments"]:
+            if s["id"] == shipment_id:
+                return cast(Shipment, s)
+        return None
 
     @rx.event
     async def create_dispute(self, shipment_id, category, priority, description):
@@ -874,6 +1056,223 @@ class AdminState(State):
         yield rx.toast.success("Support ticket created successfully.")
 
 
+class ComplianceState(State):
+    carriers: list[User] = []
+    filtered_carriers: list[CarrierData] = []
+    status_filter: str = "all"
+    search_query: str = ""
+    user_to_suspend: User | None = None
+    suspension_reason: str = "policy_violation"
+    suspension_notes: str = ""
+
+    @rx.event
+    def load_carriers(self):
+        self.carriers = [cast(User, u) for u in DB["users"] if u["role"] == "carrier"]
+        self.apply_filters()
+
+    def _get_compliance_status(self, carrier: User) -> tuple[str, int]:
+        today = datetime.date.today()
+        exp_dates = [
+            carrier.get("license_expiry"),
+            carrier.get("insurance_expiry"),
+            carrier.get("inspection_expiry"),
+        ]
+        min_days = 9999
+        has_expired = False
+        for date_str in exp_dates:
+            if date_str:
+                try:
+                    exp_date = datetime.date.fromisoformat(date_str)
+                    days_left = (exp_date - today).days
+                    if days_left < 0:
+                        has_expired = True
+                    min_days = min(min_days, days_left)
+                except (ValueError, TypeError) as e:
+                    import logging
+
+                    logging.exception(f"Error parsing date: {e}")
+                    continue
+        if has_expired or min_days < 0:
+            return ("expired", min_days)
+        if min_days <= 7:
+            return ("expiring_soon", min_days)
+        if min_days <= 30:
+            return ("expiring_soon", min_days)
+        return ("compliant", min_days)
+
+    @rx.var
+    def carriers_with_status(self) -> list[CarrierData]:
+        carrier_list: list[CarrierData] = []
+        for c in self.carriers:
+            status, days = self._get_compliance_status(c)
+            carrier_dict = cast(dict, c).copy()
+            carrier_dict["compliance_status"] = status
+            carrier_dict["days_to_expiry"] = days
+            carrier_list.append(cast(CarrierData, carrier_dict))
+        return carrier_list
+
+    @rx.event
+    def apply_filters(self):
+        carriers = self.carriers_with_status
+        if self.status_filter != "all":
+            carriers = [
+                c for c in carriers if c["compliance_status"] == self.status_filter
+            ]
+        if self.search_query:
+            query = self.search_query.lower()
+            carriers = [
+                c
+                for c in carriers
+                if query in c["full_name"].lower()
+                or (c["license_number"] and query in c["license_number"])
+            ]
+        self.filtered_carriers = carriers
+
+    @rx.event
+    def set_status_filter(self, status: str):
+        self.status_filter = status
+        self.apply_filters()
+
+    @rx.event
+    def set_search_query(self, query: str):
+        self.search_query = query
+        self.apply_filters()
+
+    @rx.event
+    def open_suspension_dialog(self, user: User):
+        self.user_to_suspend = user
+        self.suspension_reason = "policy_violation"
+        self.suspension_notes = ""
+
+    @rx.event
+    def close_suspension_dialog(self):
+        self.user_to_suspend = None
+
+    @rx.event
+    async def suspend_user(self):
+        if not self.user_to_suspend:
+            return
+        user_id = self.user_to_suspend["id"]
+        auth_state = await self.get_state(AuthState)
+        admin_state = await self.get_state(AdminState)
+        for user in DB["users"]:
+            if user["id"] == user_id:
+                user["is_suspended"] = True
+                user["suspension_reason"] = (
+                    f"{self.suspension_reason}: {self.suspension_notes}"
+                )
+                user["suspended_at"] = datetime.datetime.now().isoformat()
+                user["suspended_by"] = auth_state.user_id
+                break
+        await admin_state._log_activity(
+            "user_suspended",
+            user_id,
+            f"{self.suspension_reason}: {self.suspension_notes}",
+        )
+        self.load_carriers()
+        self.close_suspension_dialog()
+        yield rx.toast.success(self.t["user_suspended"])
+
+    @rx.event
+    async def unsuspend_user(self, user_id: str):
+        admin_state = await self.get_state(AdminState)
+        for user in DB["users"]:
+            if user["id"] == user_id:
+                user["is_suspended"] = False
+                user["suspension_reason"] = None
+                user["suspended_at"] = None
+                user["suspended_by"] = None
+                break
+        await admin_state._log_activity("user_unsuspended", user_id)
+        self.load_carriers()
+        yield rx.toast.success(self.t["user_unsuspended"])
+
+
+class ActivityLogState(State):
+    activity_logs: list[ActivityLog] = []
+    filtered_logs: list[ActivityLog] = []
+    action_filter: str = "all"
+    date_filter: dict = {}
+
+    @rx.event
+    def load_logs(self):
+        self.activity_logs = sorted(
+            DB["activity_logs"], key=lambda log: log["timestamp"], reverse=True
+        )
+        self.apply_filters()
+
+    @rx.event
+    def apply_filters(self):
+        logs = self.activity_logs
+        if self.action_filter != "all":
+            logs = [log for log in logs if log["action_type"] == self.action_filter]
+        self.filtered_logs = logs
+
+    @rx.event
+    def set_action_filter(self, action: str):
+        self.action_filter = action
+        self.apply_filters()
+
+
+class ReportingState(State):
+    revenue_data: list[dict] = []
+    shipment_volume_data: list[dict] = []
+    user_growth_data: list[dict] = []
+    popular_routes_data: list[dict] = []
+    carrier_performance_data: list[dict] = []
+
+    @rx.event
+    def load_reports(self):
+        self.revenue_data = [
+            {"name": "Jan", "revenue": 4000},
+            {"name": "Feb", "revenue": 3000},
+            {"name": "Mar", "revenue": 5000},
+            {"name": "Apr", "revenue": 4500},
+            {"name": "May", "revenue": 6000},
+            {"name": "Jun", "revenue": 5500},
+        ]
+        self.shipment_volume_data = [
+            {"name": "Delivered", "value": 400},
+            {"name": "In Transit", "value": 50},
+            {"name": "Pending", "value": 30},
+            {"name": "Cancelled", "value": 15},
+        ]
+        self.user_growth_data = [
+            {"name": "Jan", "users": 10},
+            {"name": "Feb", "users": 15},
+            {"name": "Mar", "users": 25},
+            {"name": "Apr", "users": 40},
+            {"name": "May", "users": 60},
+            {"name": "Jun", "users": 85},
+        ]
+        self.popular_routes_data = [
+            {"route": "San José -> Limón", "count": 150},
+            {"route": "San José -> Puntarenas", "count": 120},
+            {"route": "Alajuela -> Heredia", "count": 90},
+            {"route": "Cartago -> San José", "count": 80},
+        ]
+        self.carrier_performance_data = [
+            {
+                "carrier": "Carrier A",
+                "completion_rate": 98,
+                "average_rating": 4.9,
+                "total_earnings": 12500,
+            },
+            {
+                "carrier": "Carrier B",
+                "completion_rate": 95,
+                "average_rating": 4.7,
+                "total_earnings": 9800,
+            },
+            {
+                "carrier": "Carrier C",
+                "completion_rate": 99,
+                "average_rating": 4.95,
+                "total_earnings": 15200,
+            },
+        ]
+
+
 class CarrierState(State):
     available_jobs: list[Shipment] = []
     filtered_jobs: list[Shipment] = []
@@ -912,6 +1311,11 @@ class CarrierState(State):
         auth_state = await self.get_state(AuthState)
         if not auth_state.is_authenticated or auth_state.user_role != "carrier":
             yield rx.toast.error("You are not authorized to accept jobs.")
+            return
+        user_id = auth_state.user_id
+        user = next((u for u in DB["users"] if u["id"] == user_id), None)
+        if user and user["is_suspended"]:
+            yield rx.toast.error("Your account is suspended. You cannot accept jobs.")
             return
         tracking_state = await self.get_state(TrackingState)
         for shipment in DB["shipments"]:
@@ -1130,6 +1534,13 @@ class ShipmentState(State):
     async def post_shipment_for_bidding(self):
         auth_state = await self.get_state(AuthState)
         if not auth_state.is_authenticated:
+            return
+        user_id = auth_state.user_id
+        user = next((u for u in DB["users"] if u["id"] == user_id), None)
+        if user and user["is_suspended"]:
+            yield rx.toast.error(
+                "Your account is suspended. You cannot create shipments."
+            )
             return
         tracking_state = await self.get_state(TrackingState)
         self.new_shipment["id"] = "".join(

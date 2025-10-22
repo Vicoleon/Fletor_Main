@@ -34,6 +34,9 @@ def navbar() -> rx.Component:
                             AuthState.user_role == "admin",
                             rx.el.div(
                                 nav_link(State.t["admin"], "/admin"),
+                                nav_link(State.t["compliance"], "/compliance"),
+                                nav_link(State.t["activity_logs"], "/activity-logs"),
+                                nav_link(State.t["reports"], "/reports"),
                                 nav_link(State.t["disputes"], "/disputes"),
                                 nav_link(State.t["support"], "/support-tickets"),
                                 nav_link(State.t["financial"], "/financial"),

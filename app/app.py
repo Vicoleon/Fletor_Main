@@ -14,6 +14,9 @@ from app.pages.messages import messages_page
 from app.pages.disputes import disputes_page
 from app.pages.support_tickets import support_tickets_page
 from app.pages.financial import financial_page
+from app.pages.compliance import compliance_page
+from app.pages.activity_logs import activity_logs_page
+from app.pages.reports import reports_page
 
 
 def index() -> rx.Component:
@@ -85,3 +88,6 @@ app.add_page(messages_page, route="/messages/[id]")
 app.add_page(disputes_page, route="/disputes")
 app.add_page(support_tickets_page, route="/support-tickets")
 app.add_page(financial_page, route="/financial")
+app.add_page(compliance_page, route="/compliance")
+app.add_page(activity_logs_page, route="/activity-logs")
+app.add_page(reports_page, route="/reports")
