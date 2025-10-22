@@ -32,7 +32,13 @@ def navbar() -> rx.Component:
                         nav_link(State.t["profile"], "/profile"),
                         rx.cond(
                             AuthState.user_role == "admin",
-                            nav_link(State.t["admin"], "/admin"),
+                            rx.el.div(
+                                nav_link(State.t["admin"], "/admin"),
+                                nav_link(State.t["disputes"], "/disputes"),
+                                nav_link(State.t["support"], "/support-tickets"),
+                                nav_link(State.t["financial"], "/financial"),
+                                class_name="flex items-center gap-4",
+                            ),
                             None,
                         ),
                         rx.cond(

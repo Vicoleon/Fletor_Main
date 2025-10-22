@@ -125,6 +125,66 @@ TRANSLATIONS = {
         "no_messages_yet": "No messages yet. Start the conversation!",
         "message_carrier": "Message Carrier",
         "message_shipper": "Message Shipper",
+        "review": "Review",
+        "admin_dashboard": "Admin Dashboard",
+        "total_users": "Total Users",
+        "total_shippers": "Total Shippers",
+        "total_carriers": "Total Carriers",
+        "completed_shipments": "Completed Shipments",
+        "total_revenue": "Total Revenue",
+        "platform_commission": "Platform Commission",
+        "no_users_for_verification": "No users are currently pending verification.",
+        "verifying": "Verifying",
+        "close": "Close",
+        "no_documents_uploaded": "This user has not uploaded any documents yet.",
+        "approval_notes_placeholder": "Optional: Add notes for approval...",
+        "rejection_reason_placeholder": "Reason for rejection...",
+        "disputes": "Disputes",
+        "support_tickets": "Support Tickets",
+        "financial_overview": "Financial Overview",
+        "create_dispute": "Create Dispute",
+        "dispute_details": "Dispute Details",
+        "view_dispute": "View Dispute",
+        "payment_issue": "Payment Issue",
+        "service_quality": "Service Quality",
+        "cargo_damage": "Cargo Damage",
+        "delayed_delivery": "Delayed Delivery",
+        "other_issue": "Other Issue",
+        "open": "Open",
+        "investigating": "Investigating",
+        "pending_resolution": "Pending Resolution",
+        "resolved": "Resolved",
+        "closed": "Closed",
+        "new": "New",
+        "in_progress": "In Progress",
+        "waiting_on_user": "Waiting on User",
+        "priority": "Priority",
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "urgent": "Urgent",
+        "complainant": "Complainant",
+        "respondent": "Respondent",
+        "resolution": "Resolution",
+        "assign_to": "Assign To",
+        "admin_response": "Admin Response",
+        "quick_replies": "Quick Replies",
+        "mark_as_investigating": "Mark as Investigating",
+        "mark_as_resolved": "Mark as Resolved",
+        "total_revenue": "Total Revenue",
+        "platform_commission": "Platform Commission",
+        "pending_payouts": "Pending Payouts",
+        "processed_payouts": "Processed Payouts",
+        "process_payout": "Process Payout",
+        "payout_queue": "Payout Queue",
+        "commission_rate": "Commission Rate",
+        "transaction_history": "Transaction History",
+        "technical_issue": "Technical Issue",
+        "account_issue": "Account Issue",
+        "billing_issue": "Billing Issue",
+        "feature_request": "Feature Request",
+        "financial": "Financial",
+        "support": "Support",
     },
     "es": {
         "title": "Fletor",
@@ -246,6 +306,66 @@ TRANSLATIONS = {
         "no_messages_yet": "Aún no hay mensajes. ¡Inicia la conversación!",
         "message_carrier": "Contactar Transportista",
         "message_shipper": "Contactar Remitente",
+        "review": "Revisar",
+        "admin_dashboard": "Panel de Administrador",
+        "total_users": "Usuarios Totales",
+        "total_shippers": "Remitentes Totales",
+        "total_carriers": "Transportistas Totales",
+        "completed_shipments": "Envíos Completados",
+        "total_revenue": "Ingresos Totales",
+        "platform_commission": "Comisión de la Plataforma",
+        "no_users_for_verification": "No hay usuarios pendientes de verificación.",
+        "verifying": "Verificando a",
+        "close": "Cerrar",
+        "no_documents_uploaded": "Este usuario aún no ha subido ningún documento.",
+        "approval_notes_placeholder": "Opcional: Añadir notas para la aprobación...",
+        "rejection_reason_placeholder": "Razón del rechazo...",
+        "disputes": "Disputas",
+        "support_tickets": "Tiquetes de Soporte",
+        "financial_overview": "Visión Financiera",
+        "create_dispute": "Crear Disputa",
+        "dispute_details": "Detalles de la Disputa",
+        "view_dispute": "Ver Disputa",
+        "payment_issue": "Problema de Pago",
+        "service_quality": "Calidad del Servicio",
+        "cargo_damage": "Daño a la Carga",
+        "delayed_delivery": "Entrega Retrasada",
+        "other_issue": "Otro Problema",
+        "open": "Abierto",
+        "investigating": "Investigando",
+        "pending_resolution": "Pendiente de Resolución",
+        "resolved": "Resuelto",
+        "closed": "Cerrado",
+        "new": "Nuevo",
+        "in_progress": "En Progreso",
+        "waiting_on_user": "Esperando al Usuario",
+        "priority": "Prioridad",
+        "low": "Baja",
+        "medium": "Media",
+        "high": "Alta",
+        "urgent": "Urgente",
+        "complainant": "Demandante",
+        "respondent": "Demandado",
+        "resolution": "Resolución",
+        "assign_to": "Asignar A",
+        "admin_response": "Respuesta del Admin",
+        "quick_replies": "Respuestas Rápidas",
+        "mark_as_investigating": "Marcar como Investigando",
+        "mark_as_resolved": "Marcar como Resuelto",
+        "total_revenue": "Ingresos Totales",
+        "platform_commission": "Comisión de la Plataforma",
+        "pending_payouts": "Pagos Pendientes",
+        "processed_payouts": "Pagos Procesados",
+        "process_payout": "Procesar Pago",
+        "payout_queue": "Cola de Pagos",
+        "commission_rate": "Tasa de Comisión",
+        "transaction_history": "Historial de Transacciones",
+        "technical_issue": "Problema Técnico",
+        "account_issue": "Problema de Cuenta",
+        "billing_issue": "Problema de Facturación",
+        "feature_request": "Solicitud de Función",
+        "financial": "Financiero",
+        "support": "Soporte",
     },
 }
 
@@ -326,7 +446,59 @@ class Message(TypedDict):
     is_read: bool
 
 
-DB: dict[str, list] = {"users": [], "documents": [], "shipments": [], "messages": []}
+class Dispute(TypedDict):
+    id: str
+    shipment_id: str
+    complainant_id: str
+    respondent_id: str
+    category: str
+    priority: str
+    description: str
+    status: str
+    messages: list[dict]
+    resolution: str | None
+    created_at: str
+    updated_at: str
+
+
+class SupportTicket(TypedDict):
+    id: str
+    user_id: str
+    subject: str
+    category: str
+    description: str
+    priority: str
+    status: str
+    assigned_to: str | None
+    messages: list[dict]
+    resolution: str | None
+    created_at: str
+    updated_at: str
+
+
+class Payout(TypedDict):
+    id: str
+    carrier_id: str
+    shipment_ids: list[str]
+    amount: float
+    commission: float
+    net_amount: float
+    status: str
+    payment_method: str
+    scheduled_date: str
+    processed_date: str | None
+    created_at: str
+
+
+DB: dict[str, list] = {
+    "users": [],
+    "documents": [],
+    "shipments": [],
+    "messages": [],
+    "disputes": [],
+    "support_tickets": [],
+    "payouts": [],
+}
 DB["users"].append(
     {
         "id": "admin",
@@ -495,6 +667,74 @@ class ProfileState(State):
 
 class AdminState(State):
     users_for_verification: list[User] = []
+    selected_user_for_verification: User | None = None
+    selected_user_documents: list[Document] = []
+    rejection_reason: str = ""
+    approval_notes: str = ""
+    analytics: dict = {
+        "total_users": 0,
+        "total_shippers": 0,
+        "total_carriers": 0,
+        "active_shipments": 0,
+        "completed_shipments": 0,
+        "total_revenue": 0.0,
+        "platform_commission": 0.0,
+    }
+    disputes: list[Dispute] = []
+    support_tickets: list[SupportTicket] = []
+    financial_overview: dict = {
+        "total_revenue": 0.0,
+        "platform_commission": 0.0,
+        "pending_payouts": 0.0,
+        "processed_payouts": 0.0,
+    }
+    payouts: list[Payout] = []
+    selected_dispute: Dispute | None = None
+    selected_ticket: SupportTicket | None = None
+    dispute_filter: str = "all"
+    ticket_filter: str = "all"
+
+    @rx.event
+    def load_admin_dashboard(self):
+        self.load_unverified_users()
+        self.load_analytics()
+        self.load_disputes()
+        self.load_support_tickets()
+        self.load_financial_overview()
+        self.load_payout_history()
+
+    @rx.event
+    def load_analytics(self):
+        total_users = len(DB["users"]) - 1
+        total_shippers = len([u for u in DB["users"] if u["role"] == "shipper"])
+        total_carriers = len([u for u in DB["users"] if u["role"] == "carrier"])
+        active_shipments = len(
+            [
+                s
+                for s in DB["shipments"]
+                if s["status"] not in ["delivered", "cancelled"]
+            ]
+        )
+        completed_shipments = len(
+            [s for s in DB["shipments"] if s["status"] == "delivered"]
+        )
+        total_revenue = sum(
+            (
+                s["price"]
+                for s in DB["shipments"]
+                if s["price"] is not None and s["status"] == "delivered"
+            )
+        )
+        platform_commission = total_revenue * 0.1
+        self.analytics = {
+            "total_users": total_users,
+            "total_shippers": total_shippers,
+            "total_carriers": total_carriers,
+            "active_shipments": active_shipments,
+            "completed_shipments": completed_shipments,
+            "total_revenue": total_revenue,
+            "platform_commission": platform_commission,
+        }
 
     @rx.event
     def load_unverified_users(self):
@@ -505,19 +745,133 @@ class AdminState(State):
         ]
 
     @rx.event
-    def approve_user(self, user_id: str):
+    def select_user_for_verification(self, user: User):
+        self.selected_user_for_verification = user
+        self.selected_user_documents = [
+            d for d in DB["documents"] if d["user_id"] == user["id"]
+        ]
+        self.approval_notes = ""
+        self.rejection_reason = ""
+
+    @rx.event
+    def deselect_user(self):
+        self.selected_user_for_verification = None
+        self.selected_user_documents = []
+
+    @rx.event
+    def approve_user_with_notes(self):
+        if not self.selected_user_for_verification:
+            return
+        user_id = self.selected_user_for_verification["id"]
         for user in DB["users"]:
             if user["id"] == user_id:
                 user["is_verified"] = True
                 break
         self.load_unverified_users()
+        self.deselect_user()
         yield rx.toast.success(f"User {user_id} approved.")
 
     @rx.event
-    def reject_user(self, user_id: str):
+    def reject_user_with_reason(self):
+        if not self.selected_user_for_verification:
+            return
+        user_id = self.selected_user_for_verification["id"]
         DB["users"] = [user for user in DB["users"] if user["id"] != user_id]
         self.load_unverified_users()
+        self.deselect_user()
         yield rx.toast.info(f"User {user_id} rejected and removed.")
+
+    @rx.event
+    def load_disputes(self):
+        self.disputes = sorted(
+            DB["disputes"], key=lambda d: d["created_at"], reverse=True
+        )
+
+    @rx.event
+    def load_support_tickets(self):
+        self.support_tickets = sorted(
+            DB["support_tickets"], key=lambda t: t["created_at"], reverse=True
+        )
+
+    @rx.event
+    def load_financial_overview(self):
+        total_revenue = sum(
+            (s["price"] for s in DB["shipments"] if s["status"] == "delivered"), 0.0
+        )
+        platform_commission = total_revenue * 0.1
+        pending_payouts = sum(
+            (p["net_amount"] for p in DB["payouts"] if p["status"] == "pending"), 0.0
+        )
+        processed_payouts = sum(
+            (p["net_amount"] for p in DB["payouts"] if p["status"] == "processed"), 0.0
+        )
+        self.financial_overview = {
+            "total_revenue": total_revenue,
+            "platform_commission": platform_commission,
+            "pending_payouts": pending_payouts,
+            "processed_payouts": processed_payouts,
+        }
+
+    @rx.event
+    def load_payout_history(self):
+        self.payouts = sorted(
+            DB["payouts"], key=lambda p: p["created_at"], reverse=True
+        )
+
+    @rx.event
+    async def create_dispute(self, shipment_id, category, priority, description):
+        auth_state = await self.get_state(AuthState)
+        shipment = await self._get_shipment_by_id(shipment_id)
+        if not auth_state.is_authenticated or not shipment:
+            return
+        dispute_id = "".join(
+            random.choices(string.ascii_lowercase + string.digits, k=10)
+        )
+        new_dispute = Dispute(
+            id=dispute_id,
+            shipment_id=shipment_id,
+            complainant_id=auth_state.user_id,
+            respondent_id=shipment["carrier_id"]
+            if auth_state.user_role == "shipper"
+            else shipment["shipper_id"],
+            category=category,
+            priority=priority,
+            description=description,
+            status="open",
+            messages=[],
+            resolution=None,
+            created_at=datetime.datetime.now().isoformat(),
+            updated_at=datetime.datetime.now().isoformat(),
+        )
+        DB["disputes"].append(new_dispute)
+        self.load_disputes()
+        yield rx.toast.success("Dispute created successfully.")
+
+    @rx.event
+    async def create_support_ticket(self, subject, category, description, priority):
+        auth_state = await self.get_state(AuthState)
+        if not auth_state.is_authenticated:
+            return
+        ticket_id = "".join(
+            random.choices(string.ascii_lowercase + string.digits, k=10)
+        )
+        new_ticket = SupportTicket(
+            id=ticket_id,
+            user_id=auth_state.user_id,
+            subject=subject,
+            category=category,
+            description=description,
+            priority=priority,
+            status="new",
+            assigned_to=None,
+            messages=[],
+            resolution=None,
+            created_at=datetime.datetime.now().isoformat(),
+            updated_at=datetime.datetime.now().isoformat(),
+        )
+        DB["support_tickets"].append(new_ticket)
+        self.load_support_tickets()
+        yield rx.toast.success("Support ticket created successfully.")
 
 
 class CarrierState(State):

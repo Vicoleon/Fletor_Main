@@ -11,6 +11,9 @@ from app.pages.shipment_detail import shipment_detail_page
 from app.pages.jobs import jobs_page
 from app.pages.tracking import tracking_page
 from app.pages.messages import messages_page
+from app.pages.disputes import disputes_page
+from app.pages.support_tickets import support_tickets_page
+from app.pages.financial import financial_page
 
 
 def index() -> rx.Component:
@@ -79,3 +82,6 @@ app.add_page(shipment_detail_page, route="/shipment/[id]")
 app.add_page(jobs_page, route="/jobs")
 app.add_page(tracking_page, route="/tracking/[id]")
 app.add_page(messages_page, route="/messages/[id]")
+app.add_page(disputes_page, route="/disputes")
+app.add_page(support_tickets_page, route="/support-tickets")
+app.add_page(financial_page, route="/financial")
