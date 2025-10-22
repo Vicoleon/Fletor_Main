@@ -22,7 +22,7 @@ async def get_user_by_email(email: str):
     async with rx.asession() as session:
         result = await session.execute(
             text(
-                'SELECT id, email, "passwordHash", "userType" as role, status FROM users WHERE email = :email'
+                'SELECT id, email, "passwordHash", "userType" as role, status, "firstName", "lastName", phone, "companyName", "nationalId" FROM users WHERE email = :email'
             ),
             {"email": email},
         )
@@ -35,7 +35,7 @@ async def get_user_by_id(user_id: str):
     async with rx.asession() as session:
         result = await session.execute(
             text(
-                'SELECT id, email, "passwordHash", "firstName" || \' \' || "lastName" as full_name, phone, "companyName" as company_name, "userType" as role, "nationalId" as license_number, status FROM users WHERE id = :id'
+                'SELECT id, email, "passwordHash", "firstName", "lastName", phone, "companyName", "userType" as role, "nationalId", status FROM users WHERE id = :id'
             ),
             {"id": user_id},
         )
