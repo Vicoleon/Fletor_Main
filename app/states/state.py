@@ -236,6 +236,37 @@ TRANSLATIONS = {
         "completion_rate": "Completion Rate",
         "average_rating": "Average Rating",
         "total_earnings": "Total Earnings",
+        "invoices": "Invoices",
+        "payments": "Payments",
+        "payment_methods": "Payment Methods",
+        "add_payment_method": "Add Payment Method",
+        "sinpe_mobile": "SINPE Móvil",
+        "bank_transfer": "Bank Transfer",
+        "phone_number_8_digits": "Phone Number (8 digits)",
+        "add_sinpe": "Add SINPE Móvil",
+        "iban_account": "IBAN Account Number",
+        "add_bank_account": "Add Bank Account",
+        "payment_history": "Payment History",
+        "transaction_id": "Transaction ID",
+        "amount": "Amount",
+        "date": "Date",
+        "method": "Method",
+        "invoice_number": "Invoice #",
+        "issue_date": "Issue Date",
+        "due_date": "Due Date",
+        "total": "Total",
+        "download_pdf": "Download PDF",
+        "no_invoices": "You have no invoices.",
+        "draft": "Draft",
+        "issued": "Issued",
+        "paid": "Paid",
+        "overdue": "Overdue",
+        "carrier_earnings": "Carrier Earnings",
+        "net_earnings": "Net Earnings",
+        "payout_history": "Payout History",
+        "request_payout": "Request Payout",
+        "available_for_payout": "Available for Payout",
+        "no_earnings_yet": "No earnings to display yet.",
     },
     "es": {
         "title": "Fletor",
@@ -468,6 +499,37 @@ TRANSLATIONS = {
         "completion_rate": "Tasa de Finalización",
         "average_rating": "Calificación Promedio",
         "total_earnings": "Ganancias Totales",
+        "invoices": "Facturas",
+        "payments": "Pagos",
+        "payment_methods": "Métodos de Pago",
+        "add_payment_method": "Agregar Método de Pago",
+        "sinpe_mobile": "SINPE Móvil",
+        "bank_transfer": "Transferencia Bancaria",
+        "phone_number_8_digits": "Número de Teléfono (8 dígitos)",
+        "add_sinpe": "Agregar SINPE Móvil",
+        "iban_account": "Número de Cuenta IBAN",
+        "add_bank_account": "Agregar Cuenta Bancaria",
+        "payment_history": "Historial de Pagos",
+        "transaction_id": "ID de Transacción",
+        "amount": "Monto",
+        "date": "Fecha",
+        "method": "Método",
+        "invoice_number": "Factura #",
+        "issue_date": "Fecha de Emisión",
+        "due_date": "Fecha de Vencimiento",
+        "total": "Total",
+        "download_pdf": "Descargar PDF",
+        "no_invoices": "No tienes facturas.",
+        "draft": "Borrador",
+        "issued": "Emitida",
+        "paid": "Pagada",
+        "overdue": "Vencida",
+        "carrier_earnings": "Ganancias del Transportista",
+        "net_earnings": "Ganancias Netas",
+        "payout_history": "Historial de Pagos",
+        "request_payout": "Solicitar Pago",
+        "available_for_payout": "Disponible para Retiro",
+        "no_earnings_yet": "Aún no hay ganancias para mostrar.",
     },
 }
 
@@ -613,6 +675,19 @@ class ActivityLog(TypedDict):
     notes: str | None
 
 
+class Invoice(TypedDict):
+    id: str
+    invoice_number: str
+    shipment_id: str
+    shipper_id: str
+    issue_date: str
+    due_date: str
+    subtotal: float
+    tax: float
+    total: float
+    status: str
+
+
 DB: dict[str, list] = {
     "users": [],
     "documents": [],
@@ -622,6 +697,7 @@ DB: dict[str, list] = {
     "support_tickets": [],
     "payouts": [],
     "activity_logs": [],
+    "invoices": [],
 }
 DB["users"].append(
     {
@@ -1215,11 +1291,17 @@ class ActivityLogState(State):
 
 
 class ReportingState(State):
+    report_timespan: str = "monthly"
     revenue_data: list[dict] = []
     shipment_volume_data: list[dict] = []
     user_growth_data: list[dict] = []
     popular_routes_data: list[dict] = []
     carrier_performance_data: list[dict] = []
+
+    @rx.event
+    def set_report_timespan(self, timespan: str):
+        self.report_timespan = timespan
+        self.load_reports()
 
     @rx.event
     def load_reports(self):
@@ -1644,7 +1726,10 @@ class TrackingState(State):
                 yield TrackingState.simulate_gps_updates
             else:
                 self.is_tracking_active = False
-            yield rx.toast.success(f"Status updated to {self.t[new_status]}")
+                yield rx.toast.success(f"Status updated to {self.t[new_status]}")
+            if new_status == "delivered":
+                invoice_state = await self.get_state(InvoiceState)
+                await invoice_state.create_invoice(shipment_id)
 
     @rx.event
     def calculate_eta(self):
@@ -1738,3 +1823,117 @@ class MessagingState(State):
                     self.messages = current_messages
                     last_check_count = len(current_messages)
                     yield rx.toast.info("New message received!")
+
+
+class PaymentState(State):
+    sinpe_number: str = ""
+    iban_number: str = ""
+
+    @rx.event
+    def add_sinpe_number(self):
+        if len(self.sinpe_number) == 8 and self.sinpe_number.isdigit():
+            yield rx.toast.success("SINPE Móvil number added.")
+            self.sinpe_number = ""
+        else:
+            yield rx.toast.error("Invalid SINPE Móvil number. Must be 8 digits.")
+
+    @rx.event
+    def add_iban_number(self):
+        if len(self.iban_number) > 10:
+            yield rx.toast.success("IBAN added.")
+            self.iban_number = ""
+        else:
+            yield rx.toast.error("Invalid IBAN.")
+
+
+class InvoiceState(State):
+    invoices: list[Invoice] = []
+
+    @rx.event
+    async def load_invoices(self):
+        auth_state = await self.get_state(AuthState)
+        if auth_state.is_authenticated:
+            self.invoices = [
+                i for i in DB["invoices"] if i["shipper_id"] == auth_state.user_id
+            ]
+
+    @rx.event
+    async def create_invoice(self, shipment_id: str):
+        shipment = next((s for s in DB["shipments"] if s["id"] == shipment_id), None)
+        if not shipment or shipment["price"] is None:
+            return
+        invoice_count = len(DB["invoices"]) + 1
+        new_invoice = Invoice(
+            id="".join(random.choices(string.ascii_lowercase + string.digits, k=10)),
+            invoice_number=f"INV-{invoice_count:05d}",
+            shipment_id=shipment_id,
+            shipper_id=shipment["shipper_id"],
+            issue_date=datetime.date.today().isoformat(),
+            due_date=(datetime.date.today() + datetime.timedelta(days=30)).isoformat(),
+            subtotal=shipment["price"],
+            tax=shipment["price"] * 0.13,
+            total=shipment["price"] * 1.13,
+            status="issued",
+        )
+        DB["invoices"].append(new_invoice)
+        self.load_invoices()
+
+
+class CarrierEarningsState(State):
+    total_earnings: float = 0.0
+    platform_commission: float = 0.0
+    net_earnings: float = 0.0
+    available_for_payout: float = 0.0
+    payout_history: list[Payout] = []
+
+    @rx.event
+    async def load_earnings_data(self):
+        auth_state = await self.get_state(AuthState)
+        if not auth_state.is_authenticated or auth_state.user_role != "carrier":
+            return
+        completed_shipments = [
+            s
+            for s in DB["shipments"]
+            if s["carrier_id"] == auth_state.user_id and s["status"] == "delivered"
+        ]
+        self.total_earnings = sum(
+            (s["price"] for s in completed_shipments if s["price"] is not None)
+        )
+        self.platform_commission = self.total_earnings * 0.1
+        self.net_earnings = self.total_earnings - self.platform_commission
+        user_payouts = [
+            p for p in DB["payouts"] if p["carrier_id"] == auth_state.user_id
+        ]
+        total_paid_out = sum((p["net_amount"] for p in user_payouts))
+        self.available_for_payout = self.net_earnings - total_paid_out
+        self.payout_history = sorted(
+            user_payouts, key=lambda p: p["created_at"], reverse=True
+        )
+
+    @rx.event
+    async def request_payout(self):
+        auth_state = await self.get_state(AuthState)
+        if not auth_state.is_authenticated or self.available_for_payout <= 0:
+            yield rx.toast.error("No funds available for payout.")
+            return
+        payout_id = "".join(
+            random.choices(string.ascii_lowercase + string.digits, k=10)
+        )
+        new_payout = Payout(
+            id=payout_id,
+            carrier_id=auth_state.user_id,
+            shipment_ids=[],
+            amount=self.available_for_payout / 0.9,
+            commission=self.available_for_payout * 0.1 / 0.9,
+            net_amount=self.available_for_payout,
+            status="pending",
+            payment_method="sinpe_mobile",
+            scheduled_date=(
+                datetime.date.today() + datetime.timedelta(days=7)
+            ).isoformat(),
+            processed_date=None,
+            created_at=datetime.datetime.now().isoformat(),
+        )
+        DB["payouts"].append(new_payout)
+        yield rx.toast.success("Payout requested successfully.")
+        self.load_earnings_data()

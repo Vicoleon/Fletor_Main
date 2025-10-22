@@ -22,9 +22,24 @@ def reports_page() -> rx.Component:
                         class_name="text-3xl font-bold text-gray-900",
                     ),
                     rx.el.div(
-                        rx.el.button(State.t["daily"]),
-                        rx.el.button(State.t["weekly"]),
-                        rx.el.button(State.t["monthly"]),
+                        rx.el.button(
+                            State.t["daily"],
+                            on_click=lambda: ReportingState.set_report_timespan(
+                                "daily"
+                            ),
+                        ),
+                        rx.el.button(
+                            State.t["weekly"],
+                            on_click=lambda: ReportingState.set_report_timespan(
+                                "weekly"
+                            ),
+                        ),
+                        rx.el.button(
+                            State.t["monthly"],
+                            on_click=lambda: ReportingState.set_report_timespan(
+                                "monthly"
+                            ),
+                        ),
                         rx.el.button(
                             State.t["export_pdf"],
                             class_name="ml-auto bg-indigo-600 text-white px-4 py-2 rounded-md",

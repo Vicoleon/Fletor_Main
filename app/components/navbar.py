@@ -22,7 +22,15 @@ def navbar() -> rx.Component:
                     ),
                     href="/",
                 ),
-                class_name="flex items-center gap-4",
+                rx.el.div(
+                    rx.el.button(
+                        rx.cond(State.current_language == "en", "ES", "EN"),
+                        on_click=State.toggle_language,
+                        class_name="text-sm font-medium text-gray-500 hover:text-gray-900",
+                    ),
+                    class_name="pl-4 ml-4 border-l border-gray-200",
+                ),
+                class_name="flex items-center",
             ),
             rx.el.nav(
                 rx.cond(
@@ -58,14 +66,9 @@ def navbar() -> rx.Component:
                     ),
                     rx.el.div(),
                 ),
-                class_name="flex-1 flex justify-center",
+                class_name="hidden md:flex flex-1 justify-center",
             ),
             rx.el.div(
-                rx.el.button(
-                    rx.cond(State.current_language == "en", "ES", "EN"),
-                    on_click=State.toggle_language,
-                    class_name="text-sm font-medium text-gray-500 hover:text-gray-900",
-                ),
                 rx.cond(
                     AuthState.is_authenticated,
                     rx.el.button(
@@ -85,7 +88,7 @@ def navbar() -> rx.Component:
                 ),
                 class_name="flex items-center",
             ),
-            class_name="flex items-center justify-between h-16 px-4 sm:px-6 lg:px-8 border-b",
+            class_name="container mx-auto flex items-center justify-between h-16 px-4 sm:px-6 lg:px-8",
         ),
-        class_name="bg-white w-full sticky top-0 z-50",
+        class_name="bg-white w-full sticky top-0 z-50 border-b border-gray-200",
     )
