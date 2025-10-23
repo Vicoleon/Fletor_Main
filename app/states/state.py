@@ -1748,15 +1748,19 @@ class TrackingState(State):
                 lng_diff = target_lng - current_lng
                 distance_to_target = (lat_diff**2 + lng_diff**2) ** 0.5
                 if distance_to_target < 0.001:
-                    self.shipment["current_lat"] = target_lat
-                    self.shipment["current_lng"] = target_lng
+                    updated_shipment = dict(self.shipment)
+                    updated_shipment["current_lat"] = target_lat
+                    updated_shipment["current_lng"] = target_lng
+                    self.shipment = Shipment(**updated_shipment)
                     self.is_tracking_active = False
                     break
                 step = 0.002
                 new_lat = current_lat + lat_diff / distance_to_target * step
                 new_lng = current_lng + lng_diff / distance_to_target * step
-                self.shipment["current_lat"] = new_lat
-                self.shipment["current_lng"] = new_lng
+                updated_shipment = dict(self.shipment)
+                updated_shipment["current_lat"] = new_lat
+                updated_shipment["current_lng"] = new_lng
+                self.shipment = Shipment(**updated_shipment)
                 await update_shipment_location(
                     shipment_id=self.shipment["id"],
                     latitude=new_lat,
