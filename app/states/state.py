@@ -1667,44 +1667,44 @@ class TrackingState(State):
             return False
         events_data = await get_tracking_events(shipment_id)
         timeline = [
-            StatusEvent(status=e["event_type"], timestamp=e["event_timestamp"])
+            {"status": e["event_type"], "timestamp": str(e["event_timestamp"])}
             for e in events_data
         ]
-        self.shipment = Shipment(
-            id=shipment_data["id"],
-            shipper_id=shipment_data["shipper_id"],
-            carrier_id=shipment_data.get("carrier_id"),
-            pickup_location=Location(
-                address=shipment_data["pickup_address"],
-                city=shipment_data["pickup_city"],
-                province=shipment_data["pickup_province"],
-                postal_code="",
-                lat=9.9333,
-                lng=-84.0833,
-            ),
-            delivery_location=Location(
-                address=shipment_data["delivery_address"],
-                city=shipment_data["delivery_city"],
-                province=shipment_data["delivery_province"],
-                postal_code="",
-                lat=9.9936,
-                lng=-84.6333,
-            ),
-            cargo_type=shipment_data["cargo_type"],
-            weight_kg=shipment_data["weight_kg"],
-            length_m=shipment_data.get("length_m", 0),
-            width_m=shipment_data.get("width_m", 0),
-            height_m=shipment_data.get("height_m", 0),
-            special_instructions=shipment_data.get("special_instructions", ""),
-            pickup_datetime=str(shipment_data["pickup_datetime"]),
-            status=shipment_data["status"],
-            price=shipment_data["price"],
-            created_at=str(shipment_data["createdAt"]),
-            timeline=timeline,
-            current_lat=shipment_data.get("latitude"),
-            current_lng=shipment_data.get("longitude"),
-            route_polyline=None,
-        )
+        self.shipment = {
+            "id": shipment_data["id"],
+            "shipper_id": shipment_data["shipper_id"],
+            "carrier_id": shipment_data.get("carrier_id"),
+            "pickup_location": {
+                "address": shipment_data["pickup_address"],
+                "city": shipment_data["pickup_city"],
+                "province": shipment_data["pickup_province"],
+                "postal_code": "",
+                "lat": 9.9333,
+                "lng": -84.0833,
+            },
+            "delivery_location": {
+                "address": shipment_data["delivery_address"],
+                "city": shipment_data["delivery_city"],
+                "province": shipment_data["delivery_province"],
+                "postal_code": "",
+                "lat": 9.9936,
+                "lng": -84.6333,
+            },
+            "cargo_type": shipment_data["cargo_type"],
+            "weight_kg": shipment_data["weight_kg"],
+            "length_m": shipment_data.get("length_m", 0),
+            "width_m": shipment_data.get("width_m", 0),
+            "height_m": shipment_data.get("height_m", 0),
+            "special_instructions": shipment_data.get("special_instructions", ""),
+            "pickup_datetime": str(shipment_data["pickup_datetime"]),
+            "status": shipment_data["status"],
+            "price": shipment_data["price"],
+            "created_at": str(shipment_data["createdAt"]),
+            "timeline": timeline,
+            "current_lat": shipment_data.get("latitude"),
+            "current_lng": shipment_data.get("longitude"),
+            "route_polyline": None,
+        }
         self.is_tracking_active = self.shipment["status"] in [
             "PICKUP_SCHEDULED",
             "IN_TRANSIT",
@@ -1748,19 +1748,15 @@ class TrackingState(State):
                 lng_diff = target_lng - current_lng
                 distance_to_target = (lat_diff**2 + lng_diff**2) ** 0.5
                 if distance_to_target < 0.001:
-                    updated_shipment = dict(self.shipment)
-                    updated_shipment["current_lat"] = target_lat
-                    updated_shipment["current_lng"] = target_lng
-                    self.shipment = Shipment(**updated_shipment)
+                    self.shipment["current_lat"] = target_lat
+                    self.shipment["current_lng"] = target_lng
                     self.is_tracking_active = False
                     break
                 step = 0.002
                 new_lat = current_lat + lat_diff / distance_to_target * step
                 new_lng = current_lng + lng_diff / distance_to_target * step
-                updated_shipment = dict(self.shipment)
-                updated_shipment["current_lat"] = new_lat
-                updated_shipment["current_lng"] = new_lng
-                self.shipment = Shipment(**updated_shipment)
+                self.shipment["current_lat"] = new_lat
+                self.shipment["current_lng"] = new_lng
                 await update_shipment_location(
                     shipment_id=self.shipment["id"],
                     latitude=new_lat,

@@ -27,9 +27,9 @@ def user_verification_card(user: dict) -> rx.Component:
 
 
 def document_viewer() -> rx.Component:
-    return rx.radix.primitives.dialog.root(
-        rx.radix.primitives.dialog.content(
-            rx.radix.primitives.dialog.title(
+    return rx.dialog.root(
+        rx.dialog.content(
+            rx.dialog.title(
                 f"{State.t['verifying']} {AdminState.selected_user_for_verification['full_name']}"
             ),
             rx.el.div(
@@ -85,7 +85,7 @@ def document_viewer() -> rx.Component:
                     class_name="mt-4",
                 ),
             ),
-            rx.radix.primitives.dialog.close(
+            rx.dialog.close(
                 rx.el.button(
                     State.t["close"],
                     on_click=AdminState.deselect_user,

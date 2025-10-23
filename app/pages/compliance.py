@@ -30,12 +30,12 @@ def date_status_cell(date_str: rx.Var[str]) -> rx.Component:
 
 
 def suspension_modal() -> rx.Component:
-    return rx.radix.primitives.dialog.root(
-        rx.radix.primitives.dialog.content(
+    return rx.dialog.root(
+        rx.dialog.content(
             rx.cond(
                 ComplianceState.user_to_suspend,
                 rx.el.div(
-                    rx.radix.primitives.dialog.title(
+                    rx.dialog.title(
                         f"{State.t['suspend']} {ComplianceState.user_to_suspend['full_name']}"
                     ),
                     rx.el.div(
