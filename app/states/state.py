@@ -1869,6 +1869,10 @@ class MessagingState(State):
         self.new_message_text = ""
         yield rx.toast.success(self.t["message_sent_success"])
 
+    @rx.event
+    def set_new_message_text(self, text: str):
+        self.new_message_text = text
+
     @rx.event(background=True)
     async def poll_for_new_messages(self):
         import asyncio

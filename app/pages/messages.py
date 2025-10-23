@@ -56,6 +56,11 @@ def messages_page() -> rx.Component:
                             rx.el.input(
                                 placeholder=State.t["type_your_message"],
                                 on_change=MessagingState.set_new_message_text,
+                                on_key_down=lambda key: rx.cond(
+                                    key == "Enter",
+                                    MessagingState.send_message.prevent_default,
+                                    rx.noop(),
+                                ),
                                 class_name="flex-1 px-4 py-2 bg-white border border-gray-300 rounded-full focus:outline-none focus:ring-indigo-500",
                                 default_value=MessagingState.new_message_text,
                             ),
