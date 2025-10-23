@@ -10,47 +10,54 @@ class ShipmentDetailState(State):
     @rx.event
     async def load_shipment(self):
         from app.db_utils import get_shipment_by_id
+        from typing import cast
 
         shipment_id = self.router.page.params.get("id")
         if not shipment_id:
+            yield rx.redirect("/dashboard")
             return
         shipment_data = await get_shipment_by_id(shipment_id)
         if shipment_data:
-            self.shipment = {
-                "id": shipment_data["id"],
-                "shipper_id": shipment_data["shipper_id"],
-                "carrier_id": shipment_data.get("carrier_id"),
-                "pickup_location": {
-                    "address": shipment_data["pickup_address"],
-                    "city": shipment_data["pickup_city"],
-                    "province": shipment_data["pickup_province"],
-                    "postal_code": "",
-                    "lat": 0,
-                    "lng": 0,
+            self.shipment = cast(
+                Shipment,
+                {
+                    "id": shipment_data["id"],
+                    "shipper_id": shipment_data["shipper_id"],
+                    "carrier_id": shipment_data.get("carrier_id"),
+                    "pickup_location": {
+                        "address": shipment_data["pickup_address"],
+                        "city": shipment_data["pickup_city"],
+                        "province": shipment_data["pickup_province"],
+                        "postal_code": "",
+                        "lat": 0,
+                        "lng": 0,
+                    },
+                    "delivery_location": {
+                        "address": shipment_data["delivery_address"],
+                        "city": shipment_data["delivery_city"],
+                        "province": shipment_data["delivery_province"],
+                        "postal_code": "",
+                        "lat": 0,
+                        "lng": 0,
+                    },
+                    "cargo_type": shipment_data["cargo_type"],
+                    "weight_kg": shipment_data["weight_kg"],
+                    "length_m": shipment_data.get("length_cm", 0),
+                    "width_m": shipment_data.get("width_cm", 0),
+                    "height_m": shipment_data.get("height_cm", 0),
+                    "special_instructions": shipment_data.get(
+                        "special_instructions", ""
+                    ),
+                    "pickup_datetime": str(shipment_data["pickup_datetime"]),
+                    "status": shipment_data["status"],
+                    "price": shipment_data["price"],
+                    "created_at": str(shipment_data["createdAt"]),
+                    "timeline": [],
+                    "current_lat": None,
+                    "current_lng": None,
+                    "route_polyline": None,
                 },
-                "delivery_location": {
-                    "address": shipment_data["delivery_address"],
-                    "city": shipment_data["delivery_city"],
-                    "province": shipment_data["delivery_province"],
-                    "postal_code": "",
-                    "lat": 0,
-                    "lng": 0,
-                },
-                "cargo_type": shipment_data["cargo_type"],
-                "weight_kg": shipment_data["weight_kg"],
-                "length_m": shipment_data.get("length_cm", 0),
-                "width_m": shipment_data.get("width_cm", 0),
-                "height_m": shipment_data.get("height_cm", 0),
-                "special_instructions": shipment_data.get("special_instructions", ""),
-                "pickup_datetime": str(shipment_data["pickup_datetime"]),
-                "status": shipment_data["status"],
-                "price": shipment_data["price"],
-                "created_at": str(shipment_data["createdAt"]),
-                "timeline": [],
-                "current_lat": None,
-                "current_lng": None,
-                "route_polyline": None,
-            }
+            )
         else:
             yield rx.redirect("/dashboard")
 

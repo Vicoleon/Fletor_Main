@@ -880,17 +880,18 @@ class RegistrationState(State):
         self.reg_confirm_password = ""
 
 
-class ProfileState(State):
+class ProfileState(AuthState):
     user_documents: list[Document] = []
 
     @rx.var
-    async def current_user(self) -> User | None:
-        auth = await self.get_state(AuthState)
-        if not auth.is_authenticated:
+    def current_user(self) -> User | None:
+        if not self.is_authenticated:
             return None
-        for user in DB["users"]:
-            if user["id"] == auth.user_id:
-                return cast(User, user)
+        from app.db_utils import get_user_by_id
+
+        for user_data in DB["users"]:
+            if user_data["id"] == self.user_id:
+                return cast(User, user_data)
         return None
 
     @rx.event
