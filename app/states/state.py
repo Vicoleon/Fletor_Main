@@ -1647,66 +1647,71 @@ class TrackingState(State):
     is_tracking_active: bool = False
     eta: str = ""
 
-    @rx.event
-    async def load_shipment_for_tracking(self):
+    async def _reload_shipment_data(self, shipment_id: str) -> bool:
         from app.db_utils import get_shipment_by_id, get_tracking_events
 
+        shipment_data = await get_shipment_by_id(shipment_id)
+        if not shipment_data:
+            return False
+        events_data = await get_tracking_events(shipment_id)
+        timeline = [
+            StatusEvent(status=e["event_type"], timestamp=e["event_timestamp"])
+            for e in events_data
+        ]
+        self.shipment = Shipment(
+            id=shipment_data["id"],
+            shipper_id=shipment_data["shipper_id"],
+            carrier_id=shipment_data.get("carrier_id"),
+            pickup_location=Location(
+                address=shipment_data["pickup_address"],
+                city=shipment_data["pickup_city"],
+                province=shipment_data["pickup_province"],
+                postal_code="",
+                lat=9.9333,
+                lng=-84.0833,
+            ),
+            delivery_location=Location(
+                address=shipment_data["delivery_address"],
+                city=shipment_data["delivery_city"],
+                province=shipment_data["delivery_province"],
+                postal_code="",
+                lat=9.9936,
+                lng=-84.6333,
+            ),
+            cargo_type=shipment_data["cargo_type"],
+            weight_kg=shipment_data["weight_kg"],
+            length_m=shipment_data.get("length_m", 0),
+            width_m=shipment_data.get("width_m", 0),
+            height_m=shipment_data.get("height_m", 0),
+            special_instructions=shipment_data.get("special_instructions", ""),
+            pickup_datetime=str(shipment_data["pickup_datetime"]),
+            status=shipment_data["status"],
+            price=shipment_data["price"],
+            created_at=str(shipment_data["createdAt"]),
+            timeline=timeline,
+            current_lat=shipment_data.get("latitude"),
+            current_lng=shipment_data.get("longitude"),
+            route_polyline=None,
+        )
+        self.is_tracking_active = self.shipment["status"] in [
+            "PICKUP_SCHEDULED",
+            "IN_TRANSIT",
+        ]
+        self.calculate_eta()
+        return True
+
+    @rx.event
+    async def load_shipment_for_tracking(self):
         shipment_id = self.router.page.params.get("id")
         if not shipment_id:
             yield rx.redirect("/dashboard")
             return
-        shipment_data = await get_shipment_by_id(shipment_id)
-        if shipment_data:
-            events_data = await get_tracking_events(shipment_id)
-            timeline = [
-                StatusEvent(status=e["event_type"], timestamp=e["event_timestamp"])
-                for e in events_data
-            ]
-            self.shipment = Shipment(
-                id=shipment_data["id"],
-                shipper_id=shipment_data["shipper_id"],
-                carrier_id=shipment_data.get("carrier_id"),
-                pickup_location=Location(
-                    address=shipment_data["pickup_address"],
-                    city=shipment_data["pickup_city"],
-                    province=shipment_data["pickup_province"],
-                    postal_code="",
-                    lat=9.9333,
-                    lng=-84.0833,
-                ),
-                delivery_location=Location(
-                    address=shipment_data["delivery_address"],
-                    city=shipment_data["delivery_city"],
-                    province=shipment_data["delivery_province"],
-                    postal_code="",
-                    lat=9.9936,
-                    lng=-84.6333,
-                ),
-                cargo_type=shipment_data["cargo_type"],
-                weight_kg=shipment_data["weight_kg"],
-                length_m=shipment_data.get("length_m", 0),
-                width_m=shipment_data.get("width_m", 0),
-                height_m=shipment_data.get("height_m", 0),
-                special_instructions=shipment_data.get("special_instructions", ""),
-                pickup_datetime=str(shipment_data["pickup_datetime"]),
-                status=shipment_data["status"],
-                price=shipment_data["price"],
-                created_at=str(shipment_data["createdAt"]),
-                timeline=timeline,
-                current_lat=shipment_data.get("latitude"),
-                current_lng=shipment_data.get("longitude"),
-                route_polyline=None,
-            )
-            self.is_tracking_active = self.shipment["status"] in [
-                "PICKUP_SCHEDULED",
-                "IN_TRANSIT",
-            ]
-            self.calculate_eta()
-            if self.is_tracking_active:
-                yield TrackingState.simulate_gps_updates
-                return
-        else:
+        success = await self._reload_shipment_data(shipment_id)
+        if not success:
             yield rx.redirect("/dashboard")
+            return
+        if self.is_tracking_active:
+            yield TrackingState.simulate_gps_updates
 
     @rx.event(background=True)
     async def simulate_gps_updates(self):
@@ -1757,7 +1762,7 @@ class TrackingState(State):
 
     @rx.event
     async def change_shipment_status(self, new_status: str):
-        from app.db_utils import update_shipment_status, get_shipment_by_id
+        from app.db_utils import update_shipment_status
 
         if not self.shipment:
             return
@@ -1766,7 +1771,10 @@ class TrackingState(State):
         await update_shipment_status(
             shipment_id=shipment_id, new_status=new_status, user_id=auth_state.user_id
         )
-        await self.load_shipment_for_tracking()
+        success = await self._reload_shipment_data(shipment_id)
+        if not success:
+            yield rx.redirect("/dashboard")
+            return
         yield rx.toast.success(f"Status updated to {self.t[new_status]}")
         if new_status == "DELIVERED":
             invoice_state = await self.get_state(InvoiceState)
