@@ -223,7 +223,6 @@ def index() -> rx.Component:
 
 
 app = rx.App(
-    theme=rx.theme(appearance="light"),
     head_components=[
         rx.el.link(rel="preconnect", href="https://fonts.googleapis.com"),
         rx.el.link(rel="preconnect", href="https://fonts.gstatic.com", cross_origin=""),
@@ -235,6 +234,7 @@ app = rx.App(
             src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=places"
         ),
     ],
+    theme=rx.theme(appearance="light"),
 )
 app.add_page(index)
 app.add_page(login_page, route="/login")
