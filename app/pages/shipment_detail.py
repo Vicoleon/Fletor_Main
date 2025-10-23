@@ -13,7 +13,6 @@ class ShipmentDetailState(State):
 
         shipment_id = self.router.page.params.get("id")
         if not shipment_id:
-            yield rx.redirect("/dashboard")
             return
         shipment_data = await get_shipment_by_id(shipment_id)
         if shipment_data:
@@ -39,9 +38,9 @@ class ShipmentDetailState(State):
                 ),
                 cargo_type=shipment_data["cargo_type"],
                 weight_kg=shipment_data["weight_kg"],
-                length_m=shipment_data.get("length_m", 0),
-                width_m=shipment_data.get("width_m", 0),
-                height_m=shipment_data.get("height_m", 0),
+                length_m=shipment_data.get("length_cm", 0),
+                width_m=shipment_data.get("width_cm", 0),
+                height_m=shipment_data.get("height_cm", 0),
                 special_instructions=shipment_data.get("special_instructions", ""),
                 pickup_datetime=str(shipment_data["pickup_datetime"]),
                 status=shipment_data["status"],
@@ -125,7 +124,7 @@ def shipment_detail_card(shipment: rx.Var[dict]) -> rx.Component:
                 detail_item(State.t["weight_kg"], f"{shipment['weight_kg']} kg"),
                 detail_item(
                     State.t["dimensions_m"],
-                    f"{shipment['length_m']} x {shipment['width_m']} x {shipment['height_m']} m",
+                    f"{shipment['length_m']} x {shipment['width_m']} x {shipment['height_m']} cm",
                 ),
                 detail_item(
                     State.t["special_instructions"],
