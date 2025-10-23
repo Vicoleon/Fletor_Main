@@ -36,7 +36,7 @@ def financial_page() -> rx.Component:
                                 "text-yellow-500",
                             ),
                             stat_card(
-                                "check-circle",
+                                "circle-check",
                                 State.t["processed_payouts"],
                                 f"${AdminState.financial_overview['processed_payouts']:.2f}",
                                 "text-purple-500",

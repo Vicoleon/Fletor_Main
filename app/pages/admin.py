@@ -63,6 +63,7 @@ def document_viewer() -> rx.Component:
                         placeholder=State.t["approval_notes_placeholder"],
                         on_change=AdminState.set_approval_notes,
                         class_name="w-full p-2 border rounded-md",
+                        default_value=AdminState.approval_notes,
                     ),
                     rx.el.button(
                         State.t["approve"],
@@ -76,6 +77,7 @@ def document_viewer() -> rx.Component:
                         placeholder=State.t["rejection_reason_placeholder"],
                         on_change=AdminState.set_rejection_reason,
                         class_name="w-full p-2 border rounded-md",
+                        default_value=AdminState.rejection_reason,
                     ),
                     rx.el.button(
                         State.t["reject"],

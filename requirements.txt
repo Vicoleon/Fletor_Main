@@ -13,3 +13,4 @@ databricks-sdk>=0.57
 asgiproxy>=0.2
 reflex-enterprise>=0.2
 notion-client
+linear-py

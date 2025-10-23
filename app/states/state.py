@@ -796,6 +796,42 @@ class RegistrationState(State):
     success_message: str = ""
 
     @rx.event
+    def set_reg_user_type(self, value: str):
+        self.reg_user_type = value
+
+    @rx.event
+    def set_reg_full_name(self, value: str):
+        self.reg_full_name = value
+
+    @rx.event
+    def set_reg_email(self, value: str):
+        self.reg_email = value
+
+    @rx.event
+    def set_reg_phone(self, value: str):
+        self.reg_phone = value
+
+    @rx.event
+    def set_reg_company_name(self, value: str):
+        self.reg_company_name = value
+
+    @rx.event
+    def set_reg_license_number(self, value: str):
+        self.reg_license_number = value
+
+    @rx.event
+    def set_reg_vehicle_type(self, value: str):
+        self.reg_vehicle_type = value
+
+    @rx.event
+    def set_reg_password(self, value: str):
+        self.reg_password = value
+
+    @rx.event
+    def set_reg_confirm_password(self, value: str):
+        self.reg_confirm_password = value
+
+    @rx.event
     async def handle_registration(self, form_data: dict):
         self.error_message = ""
         self.success_message = ""
@@ -956,6 +992,14 @@ class AdminState(State):
     selected_ticket: SupportTicket | None = None
     dispute_filter: str = "all"
     ticket_filter: str = "all"
+
+    @rx.event
+    def set_rejection_reason(self, reason: str):
+        self.rejection_reason = reason
+
+    @rx.event
+    def set_approval_notes(self, notes: str):
+        self.approval_notes = notes
 
     @rx.event
     async def load_admin_dashboard(self):
@@ -1137,6 +1181,14 @@ class ComplianceState(State):
     suspension_notes: str = ""
 
     @rx.event
+    def set_suspension_reason(self, reason: str):
+        self.suspension_reason = reason
+
+    @rx.event
+    def set_suspension_notes(self, notes: str):
+        self.suspension_notes = notes
+
+    @rx.event
     async def load_carriers(self):
         from app.db_utils import get_carriers_with_compliance
 
@@ -1207,6 +1259,7 @@ class ComplianceState(State):
         self.status_filter = status
         self.apply_filters()
 
+    @rx.event
     @rx.event
     def set_search_query(self, query: str):
         self.search_query = query
@@ -1897,6 +1950,14 @@ class MessagingState(State):
 class PaymentState(State):
     sinpe_number: str = ""
     iban_number: str = ""
+
+    @rx.event
+    def set_sinpe_number(self, value: str):
+        self.sinpe_number = value
+
+    @rx.event
+    def set_iban_number(self, value: str):
+        self.iban_number = value
 
     @rx.event
     def add_sinpe_number(self):
