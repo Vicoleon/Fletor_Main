@@ -746,26 +746,28 @@ class AuthState(State):
     error_message: str = ""
 
     @rx.event
-    def handle_login(self, form_data: dict):
+    async def handle_login(self, form_data: dict):
+        from app.db_utils import get_user_by_email, verify_password
+
         self.error_message = ""
         login_email = form_data.get("email")
         login_password = form_data.get("password")
-        for user in DB["users"]:
-            if user["email"] == login_email and user["password_hash"] == login_password:
-                if not user["is_verified"]:
-                    self.error_message = "Your account is not verified yet."
-                    return
-                if user["is_suspended"]:
-                    self.error_message = (
-                        f"Account suspended: {user['suspension_reason']}"
-                    )
-                    return
-                self.is_authenticated = True
-                self.user_id = user["id"]
-                self.user_role = user["role"]
-                yield rx.redirect("/dashboard")
-                return
-        self.error_message = self.t["login_failed"]
+        user = await get_user_by_email(login_email)
+        if not user:
+            self.error_message = self.t["user_not_found"]
+            return
+        if not verify_password(login_password, user.password_hash):
+            self.error_message = self.t["login_failed"]
+            return
+        if user.status != "ACTIVE":
+            self.error_message = (
+                f"Account status is {user.status}. Please contact support."
+            )
+            return
+        self.is_authenticated = True
+        self.user_id = user.id
+        self.user_role = user.role.lower()
+        yield rx.redirect("/dashboard")
 
     @rx.event
     def logout(self):
