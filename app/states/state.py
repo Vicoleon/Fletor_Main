@@ -181,12 +181,10 @@ TRANSLATIONS = {
         "quick_replies": "Quick Replies",
         "mark_as_investigating": "Mark as Investigating",
         "mark_as_resolved": "Mark as Resolved",
-        "total_revenue": "Total Revenue",
-        "platform_commission": "Platform Commission",
         "pending_payouts": "Pending Payouts",
         "processed_payouts": "Processed Payouts",
         "process_payout": "Process Payout",
-        "payout_queue": "Payout Queue",
+        "payout_queue": "Cola de Pagos",
         "commission_rate": "Commission Rate",
         "transaction_history": "Transaction History",
         "technical_issue": "Technical Issue",
@@ -227,8 +225,6 @@ TRANSLATIONS = {
         "select_date_range": "Select date range",
         "user_approved": "User Approved",
         "user_rejected": "User Rejected",
-        "user_suspended": "User Suspended",
-        "user_unsuspended": "User Unsuspended",
         "dispute_resolved": "Dispute Resolved",
         "ticket_closed": "Ticket Closed",
         "reports": "Reports",
@@ -450,8 +446,6 @@ TRANSLATIONS = {
         "quick_replies": "Respuestas Rápidas",
         "mark_as_investigating": "Marcar como Investigando",
         "mark_as_resolved": "Marcar como Resuelto",
-        "total_revenue": "Ingresos Totales",
-        "platform_commission": "Comisión de la Plataforma",
         "pending_payouts": "Pagos Pendientes",
         "processed_payouts": "Pagos Procesados",
         "process_payout": "Procesar Pago",
@@ -496,8 +490,6 @@ TRANSLATIONS = {
         "select_date_range": "Seleccionar rango de fechas",
         "user_approved": "Usuario Aprobado",
         "user_rejected": "Usuario Rechazado",
-        "user_suspended": "Usuario Suspendido",
-        "user_unsuspended": "Usuario Reactivado",
         "dispute_resolved": "Disputa Resuelta",
         "ticket_closed": "Tiquete Cerrado",
         "reports": "Informes",
@@ -986,7 +978,6 @@ class AdminState(State):
         self.users_for_verification = await get_users_for_verification()
 
     @rx.event
-    @rx.event
     async def select_user_for_verification(self, user: User):
         self.selected_user_for_verification = user
         self.selected_user_documents = await get_user_documents(user["id"])
@@ -1450,7 +1441,10 @@ class ShipmentState(State):
 
         auth_state = await self.get_state(AuthState)
         if auth_state.is_authenticated and auth_state.user_role == "shipper":
-            self.shipments = await get_shipments_by_shipper(auth_state.user_id)
+            self.shipments = [
+                cast(Shipment, s)
+                for s in await get_shipments_by_shipper(auth_state.user_id)
+            ]
             self.apply_shipper_filter()
 
     @rx.event
@@ -1459,7 +1453,10 @@ class ShipmentState(State):
 
         auth_state = await self.get_state(AuthState)
         if auth_state.is_authenticated and auth_state.user_role == "carrier":
-            self.carrier_shipments = await get_shipments_by_carrier(auth_state.user_id)
+            self.carrier_shipments = [
+                cast(Shipment, s)
+                for s in await get_shipments_by_carrier(auth_state.user_id)
+            ]
             active_deliveries = len(
                 [
                     s
@@ -1692,9 +1689,9 @@ class TrackingState(State):
             },
             "cargo_type": shipment_data["cargo_type"],
             "weight_kg": shipment_data["weight_kg"],
-            "length_m": shipment_data.get("length_m", 0),
-            "width_m": shipment_data.get("width_m", 0),
-            "height_m": shipment_data.get("height_m", 0),
+            "length_m": shipment_data.get("length_cm", 0),
+            "width_m": shipment_data.get("width_cm", 0),
+            "height_m": shipment_data.get("height_cm", 0),
             "special_instructions": shipment_data.get("special_instructions", ""),
             "pickup_datetime": str(shipment_data["pickup_datetime"]),
             "status": shipment_data["status"],
@@ -1705,10 +1702,11 @@ class TrackingState(State):
             "current_lng": shipment_data.get("longitude"),
             "route_polyline": None,
         }
-        self.is_tracking_active = self.shipment["status"] in [
-            "PICKUP_SCHEDULED",
-            "IN_TRANSIT",
-        ]
+        if self.shipment:
+            self.is_tracking_active = self.shipment["status"] in [
+                "PICKUP_SCHEDULED",
+                "IN_TRANSIT",
+            ]
         self.calculate_eta()
         return True
 
@@ -1743,7 +1741,10 @@ class TrackingState(State):
                 current_lat = self.shipment.get("current_lat")
                 current_lng = self.shipment.get("current_lng")
                 if current_lat is None or current_lng is None:
-                    break
+                    current_lat = self.shipment["pickup_location"]["lat"]
+                    current_lng = self.shipment["pickup_location"]["lng"]
+                    self.shipment["current_lat"] = current_lat
+                    self.shipment["current_lng"] = current_lng
                 lat_diff = target_lat - current_lat
                 lng_diff = target_lng - current_lng
                 distance_to_target = (lat_diff**2 + lng_diff**2) ** 0.5
@@ -1926,18 +1927,20 @@ class InvoiceState(State):
         if not shipment or shipment["price"] is None:
             return
         invoice_count = len(DB["invoices"]) + 1
-        new_invoice = Invoice(
-            id="".join(random.choices(string.ascii_lowercase + string.digits, k=10)),
-            invoice_number=f"INV-{invoice_count:05d}",
-            shipment_id=shipment_id,
-            shipper_id=shipment["shipper_id"],
-            issue_date=datetime.date.today().isoformat(),
-            due_date=(datetime.date.today() + datetime.timedelta(days=30)).isoformat(),
-            subtotal=shipment["price"],
-            tax=shipment["price"] * 0.13,
-            total=shipment["price"] * 1.13,
-            status="issued",
-        )
+        new_invoice: Invoice = {
+            "id": "".join(random.choices(string.ascii_lowercase + string.digits, k=10)),
+            "invoice_number": f"INV-{invoice_count:05d}",
+            "shipment_id": shipment_id,
+            "shipper_id": shipment["shipper_id"],
+            "issue_date": datetime.date.today().isoformat(),
+            "due_date": (
+                datetime.date.today() + datetime.timedelta(days=30)
+            ).isoformat(),
+            "subtotal": shipment["price"],
+            "tax": shipment["price"] * 0.13,
+            "total": shipment["price"] * 1.13,
+            "status": "issued",
+        }
         DB["invoices"].append(new_invoice)
         self.load_invoices()
 
@@ -1982,21 +1985,21 @@ class CarrierEarningsState(State):
         payout_id = "".join(
             random.choices(string.ascii_lowercase + string.digits, k=10)
         )
-        new_payout = Payout(
-            id=payout_id,
-            carrier_id=auth_state.user_id,
-            shipment_ids=[],
-            amount=self.available_for_payout / 0.9,
-            commission=self.available_for_payout * 0.1 / 0.9,
-            net_amount=self.available_for_payout,
-            status="pending",
-            payment_method="sinpe_mobile",
-            scheduled_date=(
+        new_payout: Payout = {
+            "id": payout_id,
+            "carrier_id": auth_state.user_id,
+            "shipment_ids": [],
+            "amount": self.available_for_payout / 0.9,
+            "commission": self.available_for_payout * 0.1 / 0.9,
+            "net_amount": self.available_for_payout,
+            "status": "pending",
+            "payment_method": "sinpe_mobile",
+            "scheduled_date": (
                 datetime.date.today() + datetime.timedelta(days=7)
             ).isoformat(),
-            processed_date=None,
-            created_at=datetime.datetime.now().isoformat(),
-        )
+            "processed_date": None,
+            "created_at": datetime.datetime.now().isoformat(),
+        }
         DB["payouts"].append(new_payout)
         yield rx.toast.success("Payout requested successfully.")
         self.load_earnings_data()
