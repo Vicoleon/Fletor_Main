@@ -117,6 +117,7 @@ def register_page() -> rx.Component:
                         ),
                         on_submit=RegistrationState.handle_registration,
                         class_name="mt-8 space-y-4",
+                        reset_on_submit=True,
                     ),
                 ),
                 class_name="max-w-lg mx-auto py-12 px-4 sm:px-6 lg:px-8",

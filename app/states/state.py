@@ -3,6 +3,10 @@ from typing import TypedDict, Literal, cast
 import random
 import string
 import datetime
+import uuid
+import bcrypt
+from sqlalchemy import text
+from app.db_utils import save_uploaded_file, get_user_documents
 
 TRANSLATIONS = {
     "en": {
@@ -742,31 +746,25 @@ class AuthState(State):
     error_message: str = ""
 
     @rx.event
-    async def handle_login(self, form_data: dict):
-        from app.db_utils import get_user_by_email, verify_password
-
+    def handle_login(self, form_data: dict):
         self.error_message = ""
         login_email = form_data.get("email")
         login_password = form_data.get("password")
-        user = await get_user_by_email(login_email)
-        if user and verify_password(login_password, user.passwordHash):
-            if user.status == "PENDING":
-                self.error_message = "Your account is pending verification."
+        for user in DB["users"]:
+            if user["email"] == login_email and user["password_hash"] == login_password:
+                if not user["is_verified"]:
+                    self.error_message = "Your account is not verified yet."
+                    return
+                if user["is_suspended"]:
+                    self.error_message = (
+                        f"Account suspended: {user['suspension_reason']}"
+                    )
+                    return
+                self.is_authenticated = True
+                self.user_id = user["id"]
+                self.user_role = user["role"]
+                yield rx.redirect("/dashboard")
                 return
-            if user.status == "SUSPENDED":
-                self.error_message = "Your account has been suspended."
-                return
-            if user.status == "BANNED":
-                self.error_message = "Your account has been banned."
-                return
-            if user.status != "ACTIVE":
-                self.error_message = "Account is not active."
-                return
-            self.is_authenticated = True
-            self.user_id = user.id
-            self.user_role = user.role.lower()
-            yield rx.redirect("/dashboard")
-            return
         self.error_message = self.t["login_failed"]
 
     @rx.event
@@ -792,56 +790,74 @@ class RegistrationState(State):
     success_message: str = ""
 
     @rx.event
-    def handle_registration(self):
+    async def handle_registration(self, form_data: dict):
         self.error_message = ""
         self.success_message = ""
         if self.reg_password != self.reg_confirm_password:
             self.error_message = self.t["passwords_do_not_match"]
             return
-        user_id = "".join(random.choices(string.ascii_lowercase + string.digits, k=10))
-        license_expiry = None
-        insurance_expiry = None
-        inspection_expiry = None
-        if self.reg_user_type == "carrier":
-            license_expiry = (
-                datetime.date.today()
-                + datetime.timedelta(days=random.randint(-15, 365))
-            ).isoformat()
-            insurance_expiry = (
-                datetime.date.today()
-                + datetime.timedelta(days=random.randint(-15, 365))
-            ).isoformat()
-            inspection_expiry = (
-                datetime.date.today()
-                + datetime.timedelta(days=random.randint(-15, 365))
-            ).isoformat()
-        new_user: User = {
-            "id": user_id,
-            "email": self.reg_email,
-            "password_hash": self.reg_password,
-            "role": self.reg_user_type,
-            "full_name": self.reg_full_name,
-            "phone": self.reg_phone,
-            "company_name": self.reg_company_name
-            if self.reg_user_type == "shipper"
-            else None,
-            "license_number": self.reg_license_number
-            if self.reg_user_type == "carrier"
-            else None,
-            "vehicle_type": self.reg_vehicle_type
-            if self.reg_user_type == "carrier"
-            else None,
-            "is_verified": False,
-            "created_at": datetime.datetime.now().isoformat(),
-            "license_expiry": license_expiry,
-            "insurance_expiry": insurance_expiry,
-            "inspection_expiry": inspection_expiry,
-            "is_suspended": False,
-            "suspension_reason": None,
-            "suspended_at": None,
-            "suspended_by": None,
-        }
-        DB["users"].append(new_user)
+        if len(self.reg_password) < 8:
+            self.error_message = "Password must be at least 8 characters long."
+            return
+        user_id = str(uuid.uuid4())
+        password_hash = bcrypt.hashpw(
+            self.reg_password.encode("utf-8"), bcrypt.gensalt()
+        ).decode("utf-8")
+        first_name, *last_name_parts = self.reg_full_name.split()
+        last_name = " ".join(last_name_parts)
+        async with rx.asession() as session:
+            result = await session.execute(
+                text("SELECT id FROM users WHERE email = :email"),
+                {"email": self.reg_email},
+            )
+            if result.first():
+                self.error_message = "An account with this email already exists."
+                return
+            await session.execute(
+                text("""INSERT INTO users (id, email, "passwordHash", "userType", "firstName", "lastName", phone, "nationalId", "companyName", status, "kycStatus")
+                       VALUES (:id, :email, :password_hash, :user_type, :first_name, :last_name, :phone, :national_id, :company_name, 'PENDING', 'PENDING')"""),
+                {
+                    "id": user_id,
+                    "email": self.reg_email,
+                    "password_hash": password_hash,
+                    "user_type": self.reg_user_type.upper(),
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "phone": self.reg_phone,
+                    "national_id": self.reg_license_number
+                    if self.reg_user_type == "carrier"
+                    else None,
+                    "company_name": self.reg_company_name
+                    if self.reg_user_type == "shipper"
+                    else None,
+                },
+            )
+            if self.reg_user_type == "carrier":
+                license_expiry = (
+                    datetime.date.today()
+                    + datetime.timedelta(days=random.randint(30, 730))
+                ).isoformat()
+                insurance_expiry = (
+                    datetime.date.today()
+                    + datetime.timedelta(days=random.randint(30, 365))
+                ).isoformat()
+                inspection_expiry = (
+                    datetime.date.today()
+                    + datetime.timedelta(days=random.randint(30, 180))
+                ).isoformat()
+                carrier_id = str(uuid.uuid4())
+                await session.execute(
+                    text("""INSERT INTO carriers (id, "userId", "licenseExpiry", "insuranceExpiry", "inspectionExpiry")
+                           VALUES (:id, :user_id, :license_expiry, :insurance_expiry, :inspection_expiry)"""),
+                    {
+                        "id": carrier_id,
+                        "user_id": user_id,
+                        "license_expiry": license_expiry,
+                        "insurance_expiry": insurance_expiry,
+                        "inspection_expiry": inspection_expiry,
+                    },
+                )
+            await session.commit()
         self.success_message = self.t["registration_successful"]
         yield rx.toast.success(self.t["registration_successful"])
         yield rx.redirect("/login")
@@ -881,30 +897,28 @@ class ProfileState(State):
             upload_data = await file.read()
             upload_dir = rx.get_upload_dir()
             upload_dir.mkdir(parents=True, exist_ok=True)
-            file_path = upload_dir / file.name
+            import uuid
+
+            unique_suffix = str(uuid.uuid4())[:8]
+            unique_filename = f"{unique_suffix}_{file.name}"
+            file_path = upload_dir / unique_filename
             with file_path.open("wb") as f:
                 f.write(upload_data)
-            doc_id = "".join(
-                random.choices(string.ascii_lowercase + string.digits, k=10)
+            await save_uploaded_file(
+                user_id=auth_state.user_id,
+                file_name=file.name,
+                file_path=unique_filename,
+                file_size=len(upload_data),
+                mime_type=file.content_type,
             )
-            new_doc: Document = {
-                "id": doc_id,
-                "user_id": auth_state.user_id,
-                "name": file.name,
-                "path": file.name,
-                "uploaded_at": datetime.datetime.now().isoformat(),
-            }
-            DB["documents"].append(new_doc)
-            self.user_documents.append(new_doc)
+        await self.load_documents()
         yield rx.toast.success(f"Successfully uploaded {len(files)} file(s).")
 
     @rx.event
     async def load_documents(self):
         auth = await self.get_state(AuthState)
         if auth.is_authenticated:
-            self.user_documents = [
-                doc for doc in DB["documents"] if doc["user_id"] == auth.user_id
-            ]
+            self.user_documents = await get_user_documents(auth.user_id)
 
 
 class AdminState(State):
@@ -936,76 +950,32 @@ class AdminState(State):
     dispute_filter: str = "all"
     ticket_filter: str = "all"
 
-    async def _log_activity(
-        self, action_type: str, target_id: str, notes: str | None = None
-    ):
-        auth_state = await self.get_state(AuthState)
-        log_entry = ActivityLog(
-            id="".join(random.choices(string.ascii_lowercase + string.digits, k=10)),
-            timestamp=datetime.datetime.now().isoformat(),
-            admin_user_id=auth_state.user_id,
-            action_type=action_type,
-            target_id=target_id,
-            notes=notes,
-        )
-        DB["activity_logs"].append(log_entry)
-
     @rx.event
-    def load_admin_dashboard(self):
-        self.load_unverified_users()
-        self.load_analytics()
+    async def load_admin_dashboard(self):
+        await self.load_unverified_users()
+        await self.load_analytics()
         self.load_disputes()
         self.load_support_tickets()
         self.load_financial_overview()
         self.load_payout_history()
 
     @rx.event
-    def load_analytics(self):
-        total_users = len(DB["users"]) - 1
-        total_shippers = len([u for u in DB["users"] if u["role"] == "shipper"])
-        total_carriers = len([u for u in DB["users"] if u["role"] == "carrier"])
-        active_shipments = len(
-            [
-                s
-                for s in DB["shipments"]
-                if s["status"] not in ["delivered", "cancelled"]
-            ]
-        )
-        completed_shipments = len(
-            [s for s in DB["shipments"] if s["status"] == "delivered"]
-        )
-        total_revenue = sum(
-            (
-                s["price"]
-                for s in DB["shipments"]
-                if s["price"] is not None and s["status"] == "delivered"
-            )
-        )
-        platform_commission = total_revenue * 0.1
-        self.analytics = {
-            "total_users": total_users,
-            "total_shippers": total_shippers,
-            "total_carriers": total_carriers,
-            "active_shipments": active_shipments,
-            "completed_shipments": completed_shipments,
-            "total_revenue": total_revenue,
-            "platform_commission": platform_commission,
-        }
+    async def load_analytics(self):
+        from app.db_utils import get_platform_analytics
+
+        self.analytics = await get_platform_analytics()
 
     @rx.event
-    def load_unverified_users(self):
-        self.users_for_verification = [
-            cast(User, user)
-            for user in DB["users"]
-            if not user["is_verified"] and user["role"] != "admin"
-        ]
+    async def load_unverified_users(self):
+        from app.db_utils import get_users_for_verification
+
+        self.users_for_verification = await get_users_for_verification()
 
     @rx.event
-    def select_user_for_verification(self, user: User):
+    @rx.event
+    async def select_user_for_verification(self, user: User):
         self.selected_user_for_verification = user
-        self.selected_user_documents = [
-            d for d in DB["documents"] if d["user_id"] == user["id"]
-        ]
+        self.selected_user_documents = await get_user_documents(user["id"])
         self.approval_notes = ""
         self.rejection_reason = ""
 
@@ -1016,28 +986,41 @@ class AdminState(State):
 
     @rx.event
     async def approve_user_with_notes(self):
+        from app.db_utils import approve_user, create_activity_log
+
         if not self.selected_user_for_verification:
             return
         user_id = self.selected_user_for_verification["id"]
-        for user in DB["users"]:
-            if user["id"] == user_id:
-                user["is_verified"] = True
-                break
-        await self._log_activity("user_approved", user_id, self.approval_notes)
-        self.load_unverified_users()
+        auth_state = await self.get_state(AuthState)
+        await approve_user(user_id)
+        await create_activity_log(
+            admin_user_id=auth_state.user_id,
+            action_type="user_approved",
+            target_id=user_id,
+            notes=self.approval_notes,
+        )
+        await self.load_unverified_users()
         self.deselect_user()
         yield rx.toast.success(f"User {user_id} approved.")
 
     @rx.event
     async def reject_user_with_reason(self):
+        from app.db_utils import reject_user, create_activity_log
+
         if not self.selected_user_for_verification:
             return
         user_id = self.selected_user_for_verification["id"]
-        DB["users"] = [user for user in DB["users"] if user["id"] != user_id]
-        await self._log_activity("user_rejected", user_id, self.rejection_reason)
-        self.load_unverified_users()
+        auth_state = await self.get_state(AuthState)
+        await reject_user(user_id)
+        await create_activity_log(
+            admin_user_id=auth_state.user_id,
+            action_type="user_rejected",
+            target_id=user_id,
+            notes=self.rejection_reason,
+        )
+        await self.load_unverified_users()
         self.deselect_user()
-        yield rx.toast.info(f"User {user_id} rejected and removed.")
+        yield rx.toast.info(f"User {user_id} rejected.")
 
     @rx.event
     def load_disputes(self):
@@ -1148,8 +1131,11 @@ class ComplianceState(State):
     suspension_notes: str = ""
 
     @rx.event
-    def load_carriers(self):
-        self.carriers = [cast(User, u) for u in DB["users"] if u["role"] == "carrier"]
+    async def load_carriers(self):
+        from app.db_utils import get_carriers_with_compliance
+
+        carriers_data = await get_carriers_with_compliance()
+        self.carriers = carriers_data
         self.apply_filters()
 
     def _get_compliance_status(self, carrier: User) -> tuple[str, int]:
@@ -1236,37 +1222,25 @@ class ComplianceState(State):
             return
         user_id = self.user_to_suspend["id"]
         auth_state = await self.get_state(AuthState)
-        admin_state = await self.get_state(AdminState)
-        for user in DB["users"]:
-            if user["id"] == user_id:
-                user["is_suspended"] = True
-                user["suspension_reason"] = (
-                    f"{self.suspension_reason}: {self.suspension_notes}"
-                )
-                user["suspended_at"] = datetime.datetime.now().isoformat()
-                user["suspended_by"] = auth_state.user_id
-                break
-        await admin_state._log_activity(
-            "user_suspended",
-            user_id,
-            f"{self.suspension_reason}: {self.suspension_notes}",
+        from app.db_utils import suspend_carrier
+
+        await suspend_carrier(
+            user_id=user_id,
+            admin_id=auth_state.user_id,
+            reason=self.suspension_reason,
+            notes=self.suspension_notes,
         )
-        self.load_carriers()
+        await self.load_carriers()
         self.close_suspension_dialog()
         yield rx.toast.success(self.t["user_suspended"])
 
     @rx.event
     async def unsuspend_user(self, user_id: str):
-        admin_state = await self.get_state(AdminState)
-        for user in DB["users"]:
-            if user["id"] == user_id:
-                user["is_suspended"] = False
-                user["suspension_reason"] = None
-                user["suspended_at"] = None
-                user["suspended_by"] = None
-                break
-        await admin_state._log_activity("user_unsuspended", user_id)
-        self.load_carriers()
+        auth_state = await self.get_state(AuthState)
+        from app.db_utils import unsuspend_carrier
+
+        await unsuspend_carrier(user_id=user_id, admin_id=auth_state.user_id)
+        await self.load_carriers()
         yield rx.toast.success(self.t["user_unsuspended"])
 
 
@@ -1362,18 +1336,18 @@ class ReportingState(State):
 
 
 class CarrierState(State):
-    available_jobs: list[Shipment] = []
-    filtered_jobs: list[Shipment] = []
+    available_jobs: list[dict] = []
+    filtered_jobs: list[dict[str, str | int | float | None]] = []
     cargo_type_filter: str = "all"
     max_weight_filter: int = 50000
 
     @rx.event
     async def load_available_jobs(self):
+        from app.db_utils import get_available_shipments
+
         auth_state = await self.get_state(AuthState)
         if auth_state.user_role == "carrier":
-            self.available_jobs = [
-                s for s in DB["shipments"] if s["status"] == "pending_assignment"
-            ]
+            self.available_jobs = await get_available_shipments()
             self.apply_filters()
 
     @rx.event
@@ -1381,7 +1355,8 @@ class CarrierState(State):
         jobs = self.available_jobs
         if self.cargo_type_filter != "all":
             jobs = [j for j in jobs if j["cargo_type"] == self.cargo_type_filter]
-        jobs = [j for j in jobs if j["weight_kg"] <= self.max_weight_filter]
+        if self.max_weight_filter < 50000:
+            jobs = [j for j in jobs if j["weight_kg"] <= self.max_weight_filter]
         self.filtered_jobs = jobs
 
     @rx.event
@@ -1396,26 +1371,26 @@ class CarrierState(State):
 
     @rx.event
     async def accept_job(self, shipment_id: str):
+        from app.db_utils import assign_shipment_to_carrier
+
         auth_state = await self.get_state(AuthState)
         if not auth_state.is_authenticated or auth_state.user_role != "carrier":
             yield rx.toast.error("You are not authorized to accept jobs.")
             return
-        user_id = auth_state.user_id
-        user = next((u for u in DB["users"] if u["id"] == user_id), None)
-        if user and user["is_suspended"]:
-            yield rx.toast.error("Your account is suspended. You cannot accept jobs.")
-            return
-        tracking_state = await self.get_state(TrackingState)
-        for shipment in DB["shipments"]:
-            if shipment["id"] == shipment_id:
-                shipment["status"] = "assigned"
-                shipment["carrier_id"] = auth_state.user_id
-                shipment["current_lat"] = shipment["pickup_location"]["lat"]
-                shipment["current_lng"] = shipment["pickup_location"]["lng"]
-                await tracking_state.add_status_event(shipment_id, "assigned")
-                yield rx.toast.success(self.t["job_accepted_success"])
-                yield rx.redirect("/dashboard")
-                return
+        try:
+            await assign_shipment_to_carrier(shipment_id, auth_state.user_id)
+            yield rx.toast.success(self.t["job_accepted_success"])
+            yield rx.redirect("/dashboard")
+        except ValueError as e:
+            import logging
+
+            logging.exception(f"Error: {e}")
+            yield rx.toast.error(f"Error: {e}")
+        except Exception as e:
+            import logging
+
+            logging.exception(f"Failed to accept job: {e}")
+            yield rx.toast.error("An unexpected error occurred.")
 
 
 class ShipmentState(State):
@@ -1430,81 +1405,68 @@ class ShipmentState(State):
     filtered_shipments: list[Shipment] = []
     shipment_filter: str = "all"
     new_shipment: dict = {
-        "id": "",
         "shipper_id": "",
-        "carrier_id": None,
-        "pickup_location": {
-            "address": "",
-            "city": "",
-            "province": "",
-            "postal_code": "",
-            "lat": 9.93,
-            "lng": -84.08,
-        },
-        "delivery_location": {
-            "address": "",
-            "city": "",
-            "province": "",
-            "postal_code": "",
-            "lat": 10.0,
-            "lng": -84.21,
-        },
+        "pickup_address": "",
+        "pickup_city": "",
+        "pickup_province": "",
+        "pickup_postal_code": "",
+        "pickup_contact_name": "",
+        "pickup_contact_phone": "",
+        "delivery_address": "",
+        "delivery_city": "",
+        "delivery_province": "",
+        "delivery_postal_code": "",
+        "delivery_contact_name": "",
+        "delivery_contact_phone": "",
         "cargo_type": "general",
+        "description": "",
         "weight_kg": 0.0,
         "length_m": 0.0,
         "width_m": 0.0,
         "height_m": 0.0,
         "special_instructions": "",
-        "pickup_datetime": "",
-        "status": "pending_assignment",
-        "price": None,
-        "created_at": "",
-        "timeline": [],
-        "current_lat": None,
-        "current_lng": None,
-        "route_polyline": None,
+        "pickup_date": "",
+        "quoted_amount": 0.0,
     }
     estimated_quote: dict[str, float] = {}
 
     @rx.event
     async def load_shipper_shipments(self):
+        from app.db_utils import get_shipments_by_shipper
+
         auth_state = await self.get_state(AuthState)
         if auth_state.is_authenticated and auth_state.user_role == "shipper":
-            self.shipments = [
-                s for s in DB["shipments"] if s["shipper_id"] == auth_state.user_id
-            ]
+            self.shipments = await get_shipments_by_shipper(auth_state.user_id)
             self.apply_shipper_filter()
 
     @rx.event
     async def load_carrier_dashboard_data(self):
+        from app.db_utils import get_shipments_by_carrier, get_available_shipments
+
         auth_state = await self.get_state(AuthState)
         if auth_state.is_authenticated and auth_state.user_role == "carrier":
-            self.carrier_shipments = [
-                s for s in DB["shipments"] if s["carrier_id"] == auth_state.user_id
-            ]
+            self.carrier_shipments = await get_shipments_by_carrier(auth_state.user_id)
             active_deliveries = len(
                 [
                     s
                     for s in self.carrier_shipments
-                    if s["status"] in ["assigned", "in_transit", "picked_up"]
+                    if s["status"] in ["ACCEPTED", "IN_TRANSIT", "PICKUP_SCHEDULED"]
                 ]
             )
             completed_jobs = len(
-                [s for s in self.carrier_shipments if s["status"] == "delivered"]
+                [s for s in self.carrier_shipments if s["status"] == "DELIVERED"]
             )
             total_earnings = sum(
                 (
                     s["price"]
                     for s in self.carrier_shipments
-                    if s["status"] == "delivered" and s["price"] is not None
+                    if s["status"] == "DELIVERED" and s["price"] is not None
                 ),
                 0.0,
             )
-            available_jobs = len(
-                [s for s in DB["shipments"] if s["status"] == "pending_assignment"]
-            )
+            available_jobs_list = await get_available_shipments()
             self.carrier_dashboard_stats = {
-                "available_jobs": available_jobs,
+                "available_jobs": len(available_jobs_list),
                 "active_deliveries": active_deliveries,
                 "completed_jobs": completed_jobs,
                 "total_earnings": total_earnings,
@@ -1524,50 +1486,63 @@ class ShipmentState(State):
                 s
                 for s in self.shipments
                 if s["status"]
-                in ["pending_assignment", "assigned", "in_transit", "picked_up"]
+                in ["PENDING", "ACCEPTED", "IN_TRANSIT", "PICKUP_SCHEDULED"]
             ]
         else:
             self.filtered_shipments = [
-                s for s in self.shipments if s["status"] == self.shipment_filter
+                s for s in self.shipments if s["status"].lower() == self.shipment_filter
             ]
 
-    def _update_new_shipment(self, field, value, nested_field=None):
-        if nested_field:
-            self.new_shipment[nested_field][field] = value
-        else:
-            self.new_shipment[field] = value
+    def _update_new_shipment(self, field, value):
+        self.new_shipment[field] = value
 
     @rx.event
     def set_pickup_address(self, value: str):
-        self._update_new_shipment("address", value, "pickup_location")
+        self._update_new_shipment("pickup_address", value)
 
     @rx.event
     def set_pickup_city(self, value: str):
-        self._update_new_shipment("city", value, "pickup_location")
+        self._update_new_shipment("pickup_city", value)
 
     @rx.event
     def set_pickup_province(self, value: str):
-        self._update_new_shipment("province", value, "pickup_location")
+        self._update_new_shipment("pickup_province", value)
 
     @rx.event
     def set_pickup_postal_code(self, value: str):
-        self._update_new_shipment("postal_code", value, "pickup_location")
+        self._update_new_shipment("pickup_postal_code", value)
+
+    @rx.event
+    def set_pickup_contact_name(self, value: str):
+        self._update_new_shipment("pickup_contact_name", value)
+
+    @rx.event
+    def set_pickup_contact_phone(self, value: str):
+        self._update_new_shipment("pickup_contact_phone", value)
 
     @rx.event
     def set_delivery_address(self, value: str):
-        self._update_new_shipment("address", value, "delivery_location")
+        self._update_new_shipment("delivery_address", value)
 
     @rx.event
     def set_delivery_city(self, value: str):
-        self._update_new_shipment("city", value, "delivery_location")
+        self._update_new_shipment("delivery_city", value)
 
     @rx.event
     def set_delivery_province(self, value: str):
-        self._update_new_shipment("province", value, "delivery_location")
+        self._update_new_shipment("delivery_province", value)
 
     @rx.event
     def set_delivery_postal_code(self, value: str):
-        self._update_new_shipment("postal_code", value, "delivery_location")
+        self._update_new_shipment("delivery_postal_code", value)
+
+    @rx.event
+    def set_delivery_contact_name(self, value: str):
+        self._update_new_shipment("delivery_contact_name", value)
+
+    @rx.event
+    def set_delivery_contact_phone(self, value: str):
+        self._update_new_shipment("delivery_contact_phone", value)
 
     @rx.event
     def set_cargo_type(self, value: str):
@@ -1575,76 +1550,94 @@ class ShipmentState(State):
 
     @rx.event
     def set_weight_kg(self, value: str):
-        self._update_new_shipment("weight_kg", float(value))
+        try:
+            self._update_new_shipment("weight_kg", float(value))
+        except ValueError as e:
+            import logging
+
+            logging.exception(f"Error: {e}")
+            pass
 
     @rx.event
     def set_length_m(self, value: str):
-        self._update_new_shipment("length_m", float(value))
+        try:
+            self._update_new_shipment("length_m", float(value))
+        except ValueError as e:
+            import logging
+
+            logging.exception(f"Error: {e}")
+            pass
 
     @rx.event
     def set_width_m(self, value: str):
-        self._update_new_shipment("width_m", float(value))
+        try:
+            self._update_new_shipment("width_m", float(value))
+        except ValueError as e:
+            import logging
+
+            logging.exception(f"Error: {e}")
+            pass
 
     @rx.event
     def set_height_m(self, value: str):
-        self._update_new_shipment("height_m", float(value))
+        try:
+            self._update_new_shipment("height_m", float(value))
+        except ValueError as e:
+            import logging
+
+            logging.exception(f"Error: {e}")
+            pass
+
+    @rx.event
+    def set_description(self, value: str):
+        self._update_new_shipment("description", value)
 
     @rx.event
     def set_special_instructions(self, value: str):
         self._update_new_shipment("special_instructions", value)
 
     @rx.event
-    def set_pickup_datetime(self, value: str):
-        self._update_new_shipment("pickup_datetime", value)
+    def set_pickup_date(self, value: str):
+        self._update_new_shipment("pickup_date", value)
 
     @rx.event
     def calculate_quote(self):
-        base_rate = 50.0
-        weight_surcharge = self.new_shipment["weight_kg"] * 0.1
-        cargo_multipliers = {
-            "general": 1,
-            "refrigerated": 1.5,
-            "hazardous": 2,
-            "oversized": 1.8,
-        }
-        cargo_surcharge = base_rate * (
-            cargo_multipliers.get(self.new_shipment["cargo_type"], 1) - 1
+        from app.db_utils import calculate_shipment_quote
+
+        quote = calculate_shipment_quote(
+            weight_kg=self.new_shipment["weight_kg"],
+            cargo_type=self.new_shipment["cargo_type"],
         )
-        total = base_rate + weight_surcharge + cargo_surcharge
-        self.estimated_quote = {
-            "base_rate": base_rate,
-            "weight_surcharge": weight_surcharge,
-            "cargo_surcharge": cargo_surcharge,
-            "total": total,
-        }
+        self.estimated_quote = quote
+        self.new_shipment["quoted_amount"] = quote["total"]
 
     @rx.event
     async def post_shipment_for_bidding(self):
+        from app.db_utils import create_shipment, get_user_by_id
+
         auth_state = await self.get_state(AuthState)
         if not auth_state.is_authenticated:
+            yield rx.toast.error("Authentication required to post a shipment.")
             return
-        user_id = auth_state.user_id
-        user = next((u for u in DB["users"] if u["id"] == user_id), None)
-        if user and user["is_suspended"]:
+        user = await get_user_by_id(auth_state.user_id)
+        if not user:
+            yield rx.toast.error("User not found.")
+            return
+        if user.status != "ACTIVE":
             yield rx.toast.error(
-                "Your account is suspended. You cannot create shipments."
+                f"Account is not active ({user.status}). Cannot create shipments."
             )
             return
-        tracking_state = await self.get_state(TrackingState)
-        self.new_shipment["id"] = "".join(
-            random.choices(string.ascii_lowercase + string.digits, k=10)
-        )
         self.new_shipment["shipper_id"] = auth_state.user_id
-        self.new_shipment["created_at"] = datetime.datetime.now().isoformat()
-        self.new_shipment["price"] = self.estimated_quote.get("total")
-        self.new_shipment["status"] = "pending_assignment"
-        new_shipment_obj = self.new_shipment.copy()
-        DB["shipments"].append(new_shipment_obj)
-        await tracking_state.add_status_event(
-            new_shipment_obj["id"], "pending_assignment"
-        )
-        yield rx.toast.success(self.t["shipment_posted_success"])
-        yield rx.redirect("/dashboard")
+        try:
+            shipment_id = await create_shipment(self.new_shipment)
+            yield rx.toast.success(self.t["shipment_posted_success"])
+            yield rx.redirect("/dashboard")
+        except Exception as e:
+            import logging
+
+            logging.exception(f"Error creating shipment: {e}")
+            yield rx.toast.error(f"Failed to create shipment: {e}")
 
 
 class TrackingState(State):
@@ -1652,22 +1645,60 @@ class TrackingState(State):
     is_tracking_active: bool = False
     eta: str = ""
 
-    async def _get_shipment_by_id(self, shipment_id: str) -> Shipment | None:
-        for s in DB["shipments"]:
-            if s["id"] == shipment_id:
-                return cast(Shipment, s)
-        return None
-
     @rx.event
     async def load_shipment_for_tracking(self):
+        from app.db_utils import get_shipment_by_id, get_tracking_events
+
         shipment_id = self.router.page.params.get("id")
         if not shipment_id:
             yield rx.redirect("/dashboard")
             return
-        shipment = await self._get_shipment_by_id(shipment_id)
-        if shipment:
-            self.shipment = shipment
-            self.is_tracking_active = shipment["status"] in ["picked_up", "in_transit"]
+        shipment_data = await get_shipment_by_id(shipment_id)
+        if shipment_data:
+            events_data = await get_tracking_events(shipment_id)
+            timeline = [
+                StatusEvent(status=e["event_type"], timestamp=e["event_timestamp"])
+                for e in events_data
+            ]
+            self.shipment = Shipment(
+                id=shipment_data["id"],
+                shipper_id=shipment_data["shipper_id"],
+                carrier_id=shipment_data.get("carrier_id"),
+                pickup_location=Location(
+                    address=shipment_data["pickup_address"],
+                    city=shipment_data["pickup_city"],
+                    province=shipment_data["pickup_province"],
+                    postal_code="",
+                    lat=9.9333,
+                    lng=-84.0833,
+                ),
+                delivery_location=Location(
+                    address=shipment_data["delivery_address"],
+                    city=shipment_data["delivery_city"],
+                    province=shipment_data["delivery_province"],
+                    postal_code="",
+                    lat=9.9936,
+                    lng=-84.6333,
+                ),
+                cargo_type=shipment_data["cargo_type"],
+                weight_kg=shipment_data["weight_kg"],
+                length_m=shipment_data.get("length_m", 0),
+                width_m=shipment_data.get("width_m", 0),
+                height_m=shipment_data.get("height_m", 0),
+                special_instructions=shipment_data.get("special_instructions", ""),
+                pickup_datetime=str(shipment_data["pickup_datetime"]),
+                status=shipment_data["status"],
+                price=shipment_data["price"],
+                created_at=str(shipment_data["createdAt"]),
+                timeline=timeline,
+                current_lat=shipment_data.get("latitude"),
+                current_lng=shipment_data.get("longitude"),
+                route_polyline=None,
+            )
+            self.is_tracking_active = self.shipment["status"] in [
+                "PICKUP_SCHEDULED",
+                "IN_TRANSIT",
+            ]
             self.calculate_eta()
             if self.is_tracking_active:
                 yield TrackingState.simulate_gps_updates
@@ -1677,6 +1708,8 @@ class TrackingState(State):
 
     @rx.event(background=True)
     async def simulate_gps_updates(self):
+        from app.db_utils import update_shipment_location
+
         async with self:
             if not self.shipment or not self.is_tracking_active:
                 return
@@ -1688,8 +1721,8 @@ class TrackingState(State):
                     break
                 target_lat = self.shipment["delivery_location"]["lat"]
                 target_lng = self.shipment["delivery_location"]["lng"]
-                current_lat = self.shipment["current_lat"]
-                current_lng = self.shipment["current_lng"]
+                current_lat = self.shipment.get("current_lat")
+                current_lng = self.shipment.get("current_lng")
                 if current_lat is None or current_lng is None:
                     break
                 lat_diff = target_lat - current_lat
@@ -1701,41 +1734,41 @@ class TrackingState(State):
                     self.is_tracking_active = False
                     break
                 step = 0.002
-                self.shipment["current_lat"] += lat_diff / distance_to_target * step
-                self.shipment["current_lng"] += lng_diff / distance_to_target * step
+                new_lat = current_lat + lat_diff / distance_to_target * step
+                new_lng = current_lng + lng_diff / distance_to_target * step
+                self.shipment["current_lat"] = new_lat
+                self.shipment["current_lng"] = new_lng
+                await update_shipment_location(
+                    shipment_id=self.shipment["id"],
+                    latitude=new_lat,
+                    longitude=new_lng,
+                    address="En route",
+                )
                 self.calculate_eta()
             await asyncio.sleep(5)
 
     @rx.event
     async def add_status_event(self, shipment_id: str, status: str):
-        shipment = await self._get_shipment_by_id(shipment_id)
-        if shipment:
-            new_event = StatusEvent(
-                status=status, timestamp=datetime.datetime.now().isoformat()
-            )
-            if "timeline" not in shipment or shipment["timeline"] is None:
-                shipment["timeline"] = []
-            shipment["timeline"].append(new_event)
+        from app.db_utils import create_tracking_event
+
+        await create_tracking_event(shipment_id, status, f"Status updated to {status}")
 
     @rx.event
     async def change_shipment_status(self, new_status: str):
+        from app.db_utils import update_shipment_status, get_shipment_by_id
+
         if not self.shipment:
             return
+        auth_state = await self.get_state(AuthState)
         shipment_id = self.shipment["id"]
-        shipment = await self._get_shipment_by_id(shipment_id)
-        if shipment:
-            shipment["status"] = new_status
-            await self.add_status_event(shipment_id, new_status)
-            self.shipment = shipment
-            if new_status in ["picked_up", "in_transit"]:
-                self.is_tracking_active = True
-                yield TrackingState.simulate_gps_updates
-            else:
-                self.is_tracking_active = False
-                yield rx.toast.success(f"Status updated to {self.t[new_status]}")
-            if new_status == "delivered":
-                invoice_state = await self.get_state(InvoiceState)
-                await invoice_state.create_invoice(shipment_id)
+        await update_shipment_status(
+            shipment_id=shipment_id, new_status=new_status, user_id=auth_state.user_id
+        )
+        await self.load_shipment_for_tracking()
+        yield rx.toast.success(f"Status updated to {self.t[new_status]}")
+        if new_status == "DELIVERED":
+            invoice_state = await self.get_state(InvoiceState)
+            await invoice_state.create_invoice(shipment_id)
 
     @rx.event
     def calculate_eta(self):

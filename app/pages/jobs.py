@@ -8,13 +8,11 @@ def job_card(shipment: dict) -> rx.Component:
         rx.el.div(
             rx.el.div(
                 rx.icon("map-pin", class_name="h-5 w-5 text-gray-400"),
-                rx.el.p(
-                    f"{shipment['pickup_location']['city']} -> {shipment['delivery_location']['city']}"
-                ),
+                rx.el.p(f"{shipment['pickup_city']} -> {shipment['delivery_city']}"),
                 class_name="flex items-center gap-2 text-sm text-gray-600 font-medium",
             ),
             rx.el.span(
-                State.t[shipment["cargo_type"]],
+                State.t[shipment["cargo_type"].to(str)],
                 class_name="px-2 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800",
             ),
             class_name="flex justify-between items-center",
@@ -33,7 +31,7 @@ def job_card(shipment: dict) -> rx.Component:
             ),
             rx.el.div(
                 rx.el.p(
-                    f"{State.t['dimensions_m']}: {shipment['length_m']}x{shipment['width_m']}x{shipment['height_m']}"
+                    f"{State.t['dimensions_m']}: {shipment['length_cm']}x{shipment['width_cm']}x{shipment['height_cm']}"
                 ),
                 class_name="text-sm",
             ),

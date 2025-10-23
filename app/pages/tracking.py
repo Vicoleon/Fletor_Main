@@ -19,7 +19,7 @@ def timeline_event(event: dict, is_last: bool) -> rx.Component:
             class_name="absolute flex items-center justify-center",
         ),
         rx.el.div(
-            rx.el.p(State.t[event["status"]], class_name="font-semibold text-gray-900"),
+            rx.el.p(event["status"], class_name="font-semibold text-gray-900"),
             rx.el.time(
                 event["timestamp"].to_string(), class_name="text-sm text-gray-500"
             ),
@@ -98,21 +98,21 @@ def tracking_page() -> rx.Component:
                                     rx.el.button(
                                         State.t["mark_as_picked_up"],
                                         on_click=lambda: TrackingState.change_shipment_status(
-                                            "picked_up"
+                                            "PICKUP_SCHEDULED"
                                         ),
                                         class_name="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700",
                                     ),
                                     rx.el.button(
                                         State.t["mark_as_in_transit"],
                                         on_click=lambda: TrackingState.change_shipment_status(
-                                            "in_transit"
+                                            "IN_TRANSIT"
                                         ),
                                         class_name="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700",
                                     ),
                                     rx.el.button(
                                         State.t["mark_as_delivered"],
                                         on_click=lambda: TrackingState.change_shipment_status(
-                                            "delivered"
+                                            "DELIVERED"
                                         ),
                                         class_name="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700",
                                     ),

@@ -98,7 +98,7 @@ def cargo_details_form() -> rx.Component:
                 State.t["pickup_datetime"],
                 "",
                 "datetime-local",
-                ShipmentState.set_pickup_datetime,
+                ShipmentState.set_pickup_date,
             ),
             rx.el.div(
                 rx.el.label(
