@@ -1,5 +1,5 @@
 import reflex as rx
-from app.states.state import State
+from app.states.state import State, AuthState
 from app.components.navbar import navbar
 from app.pages.login import login_page
 from app.pages.register import register_page
