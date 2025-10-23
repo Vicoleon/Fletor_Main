@@ -352,7 +352,7 @@ async def get_shipment_by_id(shipment_id: str):
                 "deliveryProvince" as delivery_province,
                 "weightKg" as weight_kg, "lengthCm" as length_m, "widthCm" as width_m, "heightCm" as height_m,
                 "quotedAmount" as price, status, "specialInstructions" as special_instructions,
-                "createdAt", "estimatedDelivery" as estimated_delivery
+                "createdAt", "estimatedDelivery" as estimated_delivery, latitude, longitude
                 FROM shipments WHERE id = :shipment_id"""),
             {"shipment_id": shipment_id},
         )
