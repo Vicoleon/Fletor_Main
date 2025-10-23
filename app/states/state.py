@@ -99,6 +99,12 @@ TRANSLATIONS = {
         "delivered": "Delivered",
         "cancelled": "Cancelled",
         "delayed": "Delayed",
+        "PENDING": "Pending",
+        "ACCEPTED": "Accepted",
+        "PICKUP_SCHEDULED": "Pickup Scheduled",
+        "IN_TRANSIT": "In Transit",
+        "DELIVERED": "Delivered",
+        "CANCELLED": "Cancelled",
         "shipment_details": "Shipment Details",
         "available_jobs": "Available Jobs",
         "accept_job": "Accept Job",
@@ -362,6 +368,12 @@ TRANSLATIONS = {
         "delivered": "Entregado",
         "cancelled": "Cancelado",
         "delayed": "Retrasado",
+        "PENDING": "Pendiente",
+        "ACCEPTED": "Aceptado",
+        "PICKUP_SCHEDULED": "Recogida Programada",
+        "IN_TRANSIT": "En Tránsito",
+        "DELIVERED": "Entregado",
+        "CANCELLED": "Cancelado",
         "shipment_details": "Detalles del Envío",
         "available_jobs": "Trabajos Disponibles",
         "accept_job": "Aceptar Trabajo",
@@ -1775,7 +1787,9 @@ class TrackingState(State):
         if not success:
             yield rx.redirect("/dashboard")
             return
-        yield rx.toast.success(f"Status updated to {self.t[new_status]}")
+        yield rx.toast.success(
+            f"Status updated to {self.t.get(new_status, new_status)}"
+        )
         if new_status == "DELIVERED":
             invoice_state = await self.get_state(InvoiceState)
             await invoice_state.create_invoice(shipment_id)
