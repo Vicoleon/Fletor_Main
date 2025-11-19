@@ -13,3 +13,4 @@ asgiproxy>=0.2
 reflex-enterprise>=0.2
 notion-client
 linear-py
+google-genai
